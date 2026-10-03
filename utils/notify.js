@@ -32,10 +32,28 @@ const templates = {
     subject: 'Your property listing needs corrections',
     text: `${propLine(property)}Your listing was not approved yet.${reason ? `\nWhat to fix: ${reason}` : ''}\nEdit the listing and it will be re-reviewed.`,
   }),
-  booking_confirmed: ({ property, scheduledAt, role }) => ({
-    subject: 'Inspection booking confirmed',
+  inspection_requested: ({ property, scheduledAt, role }) => ({
+    subject: 'Inspection request received',
     text: `${propLine(property)}When: ${fmt(scheduledAt)}\n${
-      role === 'provider' ? 'A student has booked this slot.' : 'Your inspection is confirmed. No landlord approval is needed.'
+      role === 'provider'
+        ? 'A student has requested an inspection for this slot. It is pending administrator approval.'
+        : 'Your inspection request has been submitted and is pending administrator approval.'
+    }`,
+  }),
+  booking_confirmed: ({ property, scheduledAt, role }) => ({
+    subject: 'Inspection booking approved and confirmed',
+    text: `${propLine(property)}When: ${fmt(scheduledAt)}\n${
+      role === 'provider'
+        ? 'The inspection booking has been approved by admin and is confirmed.'
+        : 'Your inspection booking has been approved by admin and is confirmed.'
+    }`,
+  }),
+  inspection_rejected: ({ property, scheduledAt, role, reason }) => ({
+    subject: 'Inspection request rejected',
+    text: `${propLine(property)}${scheduledAt ? `Was requested for: ${fmt(scheduledAt)}\n` : ''}${
+      role === 'provider'
+        ? `The inspection request was rejected by an administrator.${reason ? `\nReason: ${reason}` : ''}\nThe slot has been opened back up.`
+        : `Your inspection request was not approved by the administrator.${reason ? `\nReason: ${reason}` : ''}`
     }`,
   }),
   inspection_reminder: ({ property, scheduledAt, role }) => ({

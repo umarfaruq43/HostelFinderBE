@@ -78,16 +78,20 @@ async function requestInspection(req, res) {
       studentId: student._id,
       slotId: claimedSlot._id,
       scheduledAt: claimedSlot.startsAt,
-      status: 'confirmed',
+      status: 'requested',
     });
 
     claimedSlot.inspectionId = inspection._id;
     await claimedSlot.save();
 
-    // Booking confirmation to student + landlord (never blocks the response)
-    notifyInspection(inspection, 'booking_confirmed');
+    // Booking notification to student + landlord (pending admin approval)
+    notifyInspection(inspection, 'inspection_requested');
 
-    return res.status(201).json({ inspection, slot: claimedSlot });
+    return res.status(201).json({
+      message: 'Inspection booked successfully. Awaiting admin approval.',
+      inspection,
+      slot: claimedSlot,
+    });
   } catch (err) {
     // Roll the slot back if we claimed it but failed afterwards.
     if (claimedSlot) await releaseSlot(claimedSlot._id).catch(() => {});
@@ -366,7 +370,7 @@ async function cancelInspection(req, res) {
     if (!student || !student._id.equals(inspection.studentId)) {
       return res.status(403).json({ message: 'Not your inspection' });
     }
-    if (['completed', 'cancelled', 'missed'].includes(inspection.status)) {
+    if (['completed', 'cancelled', 'missed', 'rejected'].includes(inspection.status)) {
       return res.status(400).json({ message: `Cannot cancel an inspection with status "${inspection.status}"` });
     }
 

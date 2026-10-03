@@ -11,7 +11,7 @@ const { protect, authorize, requireVerifiedStudent } = require('../middleware/au
 // /mine and /property/:propertyId must come before /:id
 router.post('/', protect, authorize('provider'), createSlots);
 router.get('/mine', protect, authorize('provider'), getMySlots);
-router.get('/property/:propertyId', protect, authorize('student'), requireVerifiedStudent, getPropertySlots);
+router.get('/property/:propertyId', protect, getPropertySlots);
 router.delete('/:id', protect, authorize('provider'), deleteSlot);
 
 module.exports = router;

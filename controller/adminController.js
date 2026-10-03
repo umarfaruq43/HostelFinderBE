@@ -1,6 +1,8 @@
-const { User, StudentProfile, ProviderProfile, Property, Inspection, Report } = require('../model/collectionsModel');
+const mongoose = require('mongoose');
+const { User, StudentProfile, ProviderProfile, Property, Inspection, Report, Slot } = require('../model/collectionsModel');
 
-const { notifyUser, notifyPropertyOwner } = require('../utils/notify');
+const { notifyUser, notifyPropertyOwner, notifyInspection } = require('../utils/notify');
+const { generateDefaultSlots } = require('./slotController');
 
 const VALID_REVIEW_STATUSES = ['verified', 'rejected'];
 
@@ -184,6 +186,9 @@ async function reviewProperty(req, res) {
 
     property.verificationStatus = status;
     await property.save();
+    if (status === 'verified') {
+      await generateDefaultSlots(property._id, property.providerId);
+    }
     // 'rejected' = the landlord must correct the listing (body.reason says what)
     notifyPropertyOwner(property, status === 'verified' ? 'property_verified' : 'property_correction', { reason: req.body.reason });
     return res.json({ property });
@@ -192,19 +197,87 @@ async function reviewProperty(req, res) {
   }
 }
 
-// GET /admin/inspections?status=requested  (omit status to see every inspection)
+// GET /admin/inspections?status=requested  (omit status or pass status=all to see every inspection)
 // Platform-wide visibility — unlike the student/provider inspection routes,
 // this isn't scoped to "mine" or "received", it's everything.
 async function getInspections(req, res) {
   try {
     const { status } = req.query;
-    const filter = status ? { status } : {};
+    const filter = status && status !== 'all' ? { status } : {};
     const inspections = await Inspection.find(filter)
       .populate('propertyId')
-      .populate({ path: 'studentId', populate: { path: 'userId', select: 'email' } });
+      .populate({ path: 'studentId', populate: { path: 'userId', select: 'email' } })
+      .populate('slotId')
+      .sort({ createdAt: -1 });
     return res.json({ inspections });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to fetch inspections', error: err.message });
+  }
+}
+
+// PUT /admin/inspections/:id  body: { status: 'confirmed' | 'rejected', reason?: string }
+// (also accepts action: 'approve' | 'reject')
+async function reviewInspection(req, res) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid inspection ID' });
+    }
+
+    const inspection = await Inspection.findById(id).populate('propertyId');
+    if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
+
+    let targetStatus = req.body.status || req.body.action;
+    if (!targetStatus) {
+      return res.status(400).json({ message: 'status or action is required (confirmed/approved or rejected)' });
+    }
+    targetStatus = String(targetStatus).toLowerCase().trim();
+
+    const isApprove = ['confirmed', 'approved', 'approve'].includes(targetStatus);
+    const isReject = ['rejected', 'reject', 'cancelled', 'decline', 'declined'].includes(targetStatus);
+
+    if (!isApprove && !isReject) {
+      return res.status(400).json({ message: 'status must be confirmed/approved or rejected' });
+    }
+
+    if (inspection.status !== 'requested') {
+      return res.status(400).json({
+        message: `Cannot review an inspection with status "${inspection.status}". Only "requested" bookings can be reviewed.`,
+      });
+    }
+
+    if (isApprove) {
+      inspection.status = 'confirmed';
+      await inspection.save();
+
+      notifyInspection(inspection, 'booking_confirmed');
+
+      return res.json({
+        message: 'Inspection approved and confirmed',
+        inspection,
+      });
+    } else {
+      const reason = req.body.reason || 'Rejected by administrator';
+      inspection.status = 'rejected';
+      inspection.declineReason = reason;
+      await inspection.save();
+
+      if (inspection.slotId) {
+        await Slot.updateOne(
+          { _id: inspection.slotId },
+          { $set: { status: 'open' }, $unset: { bookedBy: '', inspectionId: '' } }
+        );
+      }
+
+      notifyInspection(inspection, 'inspection_rejected', { reason });
+
+      return res.json({
+        message: 'Inspection rejected',
+        inspection,
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to review inspection', error: err.message });
   }
 }
 
@@ -251,6 +324,7 @@ module.exports = {
   getPropertyVerifications,
   reviewProperty,
   getInspections,
+  reviewInspection,
   getReports,
   updateReportStatus,
 };

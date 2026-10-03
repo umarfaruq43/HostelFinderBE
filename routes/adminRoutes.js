@@ -10,6 +10,7 @@ const {
   getPropertyVerifications,
   reviewProperty,
   getInspections,
+  reviewInspection,
   getReports,
   updateReportStatus,
 } = require('../controller/adminController');
@@ -31,6 +32,7 @@ router.get('/properties', getPropertyVerifications);
 router.put('/properties/:id', reviewProperty);
 
 router.get('/inspections', getInspections);
+router.put('/inspections/:id', reviewInspection);
 
 router.get('/reports', getReports);
 router.put('/reports/:id', updateReportStatus);

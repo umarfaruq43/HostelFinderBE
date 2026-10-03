@@ -557,7 +557,7 @@
                 "properties"
               ]
             },
-            "description": "Creates listing. Auto-calculates distanceFromSchoolKm and drivingTimeMinutes. Saves ID to {{propertyId}}."
+            "description": "Creates listing. Auto-calculates distanceFromSchoolKm and drivingTimeMinutes. Automatically generates default open inspection slots for upcoming weekdays (2-3 PM, 4-5 PM, 5-6 PM, 6-7 PM). Saves ID to {{propertyId}}."
           }
         },
         {
@@ -716,7 +716,7 @@
           }
         },
         {
-          "name": "Get Open Slots for Property (Verified Student)",
+          "name": "Get Open Slots for Property (Student / Provider / Admin)",
           "event": [
             {
               "listen": "test",
@@ -752,7 +752,7 @@
                 "{{propertyId}}"
               ]
             },
-            "description": "Student views bookable open slots for an upcoming inspection. Requires verified student status."
+            "description": "Student, provider, or admin views bookable open slots for an upcoming inspection. Returns total count, raw slots array, and groupedByDate formatted for the date & time selector UI."
           }
         },
         {
@@ -827,7 +827,7 @@
                 "inspections"
               ]
             },
-            "description": "Atomically claims the chosen slot and creates a confirmed inspection. Triggers email notifications."
+            "description": "Atomically claims the chosen slot and creates an inspection booking with status 'requested' awaiting administrator approval. Triggers email notification."
           }
         },
         {
@@ -1768,6 +1768,115 @@
           }
         },
         {
+          "name": "Get Inspections Queue - Pending (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.inspections && data.inspections.length > 0) {",
+                  "        pm.collectionVariables.set('inspectionId', data.inspections[0]._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inspections?status=requested",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inspections"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "requested"
+                }
+              ]
+            },
+            "description": "Fetch pending student inspection bookings awaiting administrator approval. Automatically saves first ID to {{inspectionId}}."
+          }
+        },
+        {
+          "name": "Review Inspection - Approve (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inspections",
+                "{{inspectionId}}"
+              ]
+            },
+            "description": "Admin approves student inspection booking (moves status to 'confirmed'). Sends confirmation email notifications to student and landlord."
+          }
+        },
+        {
+          "name": "Review Inspection - Reject (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\",\n  \"reason\": \"Landlord unavailable or duplicate inspection request.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inspections",
+                "{{inspectionId}}"
+              ]
+            },
+            "description": "Admin rejects inspection request (status -> 'rejected'). Automatically releases the slot back to 'open' so other students can select it, and notifies student and landlord."
+          }
+        },
+        {
           "name": "Get All Platform Inspections (Admin)",
           "request": {
             "method": "GET",
@@ -1793,7 +1902,7 @@
                 }
               ]
             },
-            "description": "Platform-wide view of all inspection bookings."
+            "description": "Platform-wide view of all inspection bookings (omit status or pass status=all to view all)."
           }
         },
         {

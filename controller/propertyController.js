@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Property, ProviderProfile, StudentProfile, School } = require('../model/collectionsModel');
+const { generateDefaultSlots } = require('./slotController');
 
 // Helper: fetch the ProviderProfile for the logged-in user
 async function getProviderProfile(userId) {
@@ -129,7 +130,10 @@ async function createProperty(req, res) {
       // verificationStatus defaults to 'pending' — goes to the admin queue (US-17)
     });
 
-    return res.status(201).json({ property });
+    // Automatically generate open inspection slots for this new property listing
+    const defaultSlots = await generateDefaultSlots(property._id, provider._id);
+
+    return res.status(201).json({ property, slotsCreated: defaultSlots.length });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to create property', error: err.message });
   }

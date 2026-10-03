@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Slot, Property, ProviderProfile } = require('../model/collectionsModel');
+const { Slot, Property, ProviderProfile, StudentProfile } = require('../model/collectionsModel');
 
 // ---- US-18 limits (MVP) ---------------------------------------------------
 const DEFAULT_SLOT_MINUTES = 30;
@@ -172,9 +172,9 @@ async function getMySlots(req, res) {
   }
 }
 
-// GET /slots/property/:propertyId  (verified students only)
-// Open, upcoming slots for a verified + available property. This is what
-// makes slots "visible to eligible students".
+// GET /slots/property/:propertyId
+// Open, upcoming slots for a property. Automatically ensures default open slots exist.
+// Returns count, raw slots array, and groupedByDate formatted for the date/time selector UI.
 async function getPropertySlots(req, res) {
   try {
     const { propertyId } = req.params;
@@ -182,15 +182,27 @@ async function getPropertySlots(req, res) {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    const property = await Property.findById(propertyId).select('verificationStatus availabilityStatus');
-    if (!property || property.verificationStatus !== 'verified') {
+    const property = await Property.findById(propertyId).select('verificationStatus availabilityStatus providerId');
+    if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
-    if (property.availabilityStatus !== 'available') {
-      return res.status(400).json({ message: 'Property is not available' });
+
+    // Role-specific visibility rules
+    if (req.user && req.user.role === 'student') {
+      const student = await StudentProfile.findOne({ userId: req.user._id });
+      if (!student || student.verificationStatus !== 'verified') {
+        return res.status(403).json({ message: 'Student verification required to view slots' });
+      }
+      if (property.verificationStatus !== 'verified') {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+      if (property.availabilityStatus !== 'available') {
+        return res.status(400).json({ message: 'Property is not available' });
+      }
     }
 
-    const slots = await Slot.find({
+    // Fetch open upcoming slots
+    let slots = await Slot.find({
       propertyId: property._id,
       status: 'open',
       startsAt: { $gt: new Date() },
@@ -198,9 +210,137 @@ async function getPropertySlots(req, res) {
       .select('propertyId startsAt endsAt status')
       .sort({ startsAt: 1 });
 
-    return res.json({ count: slots.length, slots });
+    // If no slots exist yet, automatically generate them
+    if (slots.length === 0) {
+      await generateDefaultSlots(property._id, property.providerId);
+      slots = await Slot.find({
+        propertyId: property._id,
+        status: 'open',
+        startsAt: { $gt: new Date() },
+      })
+        .select('propertyId startsAt endsAt status')
+        .sort({ startsAt: 1 });
+    }
+
+    // Group slots by date for frontend UI consumption matching sample
+    const groupedMap = new Map();
+    for (const slot of slots) {
+      const d = new Date(slot.startsAt);
+      const dateKey = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' }); // YYYY-MM-DD
+      const weekday = d.toLocaleDateString('en-US', { timeZone: 'Africa/Lagos', weekday: 'short' });
+      const day = d.toLocaleDateString('en-US', { timeZone: 'Africa/Lagos', day: 'numeric' });
+      const month = d.toLocaleDateString('en-US', { timeZone: 'Africa/Lagos', month: 'short' });
+      const dateLabel = `${weekday} ${day} ${month}`;
+
+      const startTime = d.toLocaleTimeString('en-US', {
+        timeZone: 'Africa/Lagos',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      const endTime = new Date(slot.endsAt).toLocaleTimeString('en-US', {
+        timeZone: 'Africa/Lagos',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      const timeLabel = `${startTime} – ${endTime}`;
+
+      if (!groupedMap.has(dateKey)) {
+        groupedMap.set(dateKey, {
+          date: dateKey,
+          label: dateLabel,
+          weekday,
+          day: Number(day),
+          month,
+          slots: [],
+        });
+      }
+
+      groupedMap.get(dateKey).slots.push({
+        _id: slot._id,
+        propertyId: slot.propertyId,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        timeLabel,
+        status: slot.status,
+      });
+    }
+
+    const groupedByDate = Array.from(groupedMap.values());
+
+    return res.json({ count: slots.length, slots, groupedByDate });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to fetch slots', error: err.message });
+  }
+}
+
+// Generates default inspection slots for a property matching the standard schedule:
+// Next 10 weekdays (Monday to Friday, 2 weeks) with 4 time slots per day:
+// - 2:00 PM – 3:00 PM (14:00 to 15:00)
+// - 4:00 PM – 5:00 PM (16:00 to 17:00)
+// - 5:00 PM – 6:00 PM (17:00 to 18:00)
+// - 6:00 PM – 7:00 PM (18:00 to 19:00)
+async function generateDefaultSlots(propertyId, providerId, daysAhead = 10) {
+  try {
+    const now = new Date();
+    const slotTimes = [
+      { startHour: 14, endHour: 15 }, // 2:00 PM – 3:00 PM
+      { startHour: 16, endHour: 17 }, // 4:00 PM – 5:00 PM
+      { startHour: 17, endHour: 18 }, // 5:00 PM – 6:00 PM
+      { startHour: 18, endHour: 19 }, // 6:00 PM – 7:00 PM
+    ];
+
+    const slotsToCreate = [];
+    const cursor = new Date(now);
+
+    let weekdaysCount = 0;
+    while (weekdaysCount < daysAhead) {
+      cursor.setDate(cursor.getDate() + 1);
+      const dayOfWeek = cursor.getDay();
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        weekdaysCount++;
+        const year = cursor.getFullYear();
+        const month = String(cursor.getMonth() + 1).padStart(2, '0');
+        const day = String(cursor.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+
+        for (const t of slotTimes) {
+          const startStr = `${dateStr}T${String(t.startHour).padStart(2, '0')}:00:00+01:00`;
+          const endStr = `${dateStr}T${String(t.endHour).padStart(2, '0')}:00:00+01:00`;
+          const startsAt = new Date(startStr);
+          const endsAt = new Date(endStr);
+
+          if (startsAt > now) {
+            slotsToCreate.push({
+              propertyId,
+              providerId,
+              startsAt,
+              endsAt,
+              status: 'open',
+            });
+          }
+        }
+      }
+    }
+
+    if (slotsToCreate.length === 0) return [];
+
+    const existing = await Slot.find({
+      propertyId,
+      startsAt: { $in: slotsToCreate.map((s) => s.startsAt) },
+    }).select('startsAt');
+
+    const existingTimes = new Set(existing.map((e) => e.startsAt.getTime()));
+    const fresh = slotsToCreate.filter((s) => !existingTimes.has(s.startsAt.getTime()));
+
+    if (fresh.length === 0) return [];
+
+    const created = await Slot.insertMany(fresh, { ordered: false });
+    return created;
+  } catch (err) {
+    console.error('Error generating default slots:', err.message);
+    return [];
   }
 }
 
@@ -234,4 +374,4 @@ async function deleteSlot(req, res) {
   }
 }
 
-module.exports = { createSlots, getMySlots, getPropertySlots, deleteSlot };
+module.exports = { createSlots, getMySlots, getPropertySlots, deleteSlot, generateDefaultSlots };

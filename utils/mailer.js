@@ -15,8 +15,6 @@ function parseSender(fromStr, fallbackEmail) {
 }
 
 async function sendMail({ to, subject, text, html }) {
-    // 1. If Brevo API Key is configured, send via Brevo REST API (HTTPS / Port 443)
-    // This completely bypasses SMTP port 25/465/587 blocks on cloud providers like Render.
     if (process.env.BREVO_API_KEY) {
         const sender = parseSender(
             process.env.MAIL_FROM || process.env.SMTP_USER,
