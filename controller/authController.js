@@ -15,7 +15,7 @@ async function getProfileForUser(user) {
 
 // POST /auth/register
 // body: { email, password, confirmPassword?, role: 'student'|'provider',
-//         fullName (student), phone, schoolId?, businessName?, verificationDocUrl? }
+//         fullName (student), phone, schoolId?, businessName?, verificationDocUrl? (provider) }
 // Public registration only allows 'student' and 'provider' — admin accounts
 // are created separately (e.g. seeded or created by an existing admin).
 async function register(req, res) {
@@ -66,7 +66,7 @@ async function register(req, res) {
     let profile;
     if (role === 'student') {
       profile = await StudentProfile.create({
-        userId: user._id, fullName, phone, schoolId, verificationDocUrl,
+        userId: user._id, fullName, phone, schoolId,
       });
     } else {
       profile = await ProviderProfile.create({
@@ -79,7 +79,8 @@ async function register(req, res) {
     return res.status(201).json({
       token,
       user: { id: user._id, email: user.email, role: user.role },
-      verificationStatus: profile.verificationStatus, // 'pending' for every new profile
+      // Only providers are reviewed by an admin; students have no review step
+      verificationStatus: role === 'provider' ? profile.verificationStatus : null,
       // Both roles must verify their email before they can log in — the
       // client should call POST /auth/otp/send with this token right after
       // registering (see otpController.js). Registration itself does not
@@ -94,6 +95,9 @@ async function register(req, res) {
     if (user) {
       await User.deleteOne({ _id: user._id }).catch(() => {});
     }
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'Email already registered' });
+    }
     return res.status(500).json({ message: 'Registration failed', error: err.message });
   }
 }
@@ -107,7 +111,7 @@ async function login(req, res) {
       return res.status(400).json({ message: 'email and password are required' });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase() });
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
@@ -136,7 +140,7 @@ async function login(req, res) {
     return res.json({
       token,
       user: { id: user._id, email: user.email, role: user.role, emailVerified: user.emailVerified },
-      verificationStatus: profile ? profile.verificationStatus : null,
+      verificationStatus: user.role === 'provider' && profile ? profile.verificationStatus : null,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Login failed', error: err.message });
@@ -144,15 +148,15 @@ async function login(req, res) {
 }
 
 // GET /auth/me  (protected — requires the `protect` middleware first)
-// Returns the user plus their profile and verification status so the client
-// can render locked/unlocked states (US-11) and the landlord dashboard (US-15).
+// Returns the user plus their profile (and the verification status for
+// providers) so the client can render the landlord dashboard (US-15).
 async function me(req, res) {
   try {
     const profile = await getProfileForUser(req.user);
     return res.json({
       user: req.user,
       profile,
-      verificationStatus: profile ? profile.verificationStatus : null,
+      verificationStatus: req.user.role === 'provider' && profile ? profile.verificationStatus : null,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load account', error: err.message });
