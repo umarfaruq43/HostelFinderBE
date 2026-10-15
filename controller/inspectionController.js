@@ -55,7 +55,7 @@ async function requestInspection(req, res) {
       return res.status(409).json({ message: 'You already have an open booking for this property' });
     }
 
-    // Atomic claim: succeeds only if the slot is still open, in the future,
+    // Automatic claim: succeeds only if the slot is still open, in the future,
     // and belongs to this property.
     claimedSlot = await Slot.findOneAndUpdate(
       { _id: slotId, propertyId: property._id, status: 'open', startsAt: { $gt: new Date() } },

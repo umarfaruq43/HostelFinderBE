@@ -66,7 +66,7 @@ async function register(req, res) {
     let profile;
     if (role === 'student') {
       profile = await StudentProfile.create({
-        userId: user._id, fullName, phone, schoolId,
+        userId: user._id, fullName, phone, schoolId, verificationStatus: 'verified', // students are auto-verified; only providers need admin review
       });
     } else {
       profile = await ProviderProfile.create({

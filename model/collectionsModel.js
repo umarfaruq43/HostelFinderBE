@@ -90,7 +90,7 @@ const studentProfileSchema = new Schema(
         verificationStatus: {
             type: String,
             enum: ["pending", "verified", "rejected"],
-            default: "pending",
+            default: "verified", // students are auto-verified; only providers need admin review
         },
         verificationDocUrl: String,
     },
