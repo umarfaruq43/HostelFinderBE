@@ -190,9 +190,7 @@ async function getPropertySlots(req, res) {
     // Role-specific visibility rules
     if (req.user && req.user.role === 'student') {
       const student = await StudentProfile.findOne({ userId: req.user._id });
-      if (!student || student.verificationStatus !== 'verified') {
-        return res.status(403).json({ message: 'Student verification required to view slots' });
-      }
+      
       if (property.verificationStatus !== 'verified') {
         return res.status(404).json({ message: 'Property not found' });
       }
