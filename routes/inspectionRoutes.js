@@ -8,6 +8,7 @@ const {
   scheduleInspection,
   declineInspection,
   rescheduleInspection,
+  rescheduleMyInspection,
   missedInspection,
   completeInspection,
   decideInspection,
@@ -23,6 +24,7 @@ router.get('/:id', protect, getInspectionById);
 router.put('/:id/schedule', protect, authorize('provider'), scheduleInspection);
 router.put('/:id/decline', protect, authorize('provider'), declineInspection);
 router.put('/:id/reschedule', protect, authorize('provider'), rescheduleInspection);
+router.put('/:id/reschedule-mine', protect, authorize('student'), rescheduleMyInspection);
 router.put('/:id/missed', protect, authorize('provider'), missedInspection);
 router.put('/:id/complete', protect, authorize('provider'), completeInspection);
 router.put('/:id/decision', protect, authorize('student'), decideInspection);

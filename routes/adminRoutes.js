@@ -3,8 +3,6 @@ const router = express.Router();
 const {
   getAllUsers,
   updateUserStatus,
-  getStudentVerifications,
-  reviewStudent,
   getProviderVerifications,
   reviewProvider,
   getPropertyVerifications,
@@ -21,9 +19,6 @@ router.use(protect, authorize('admin'));
 
 router.get('/users', getAllUsers);
 router.put('/users/:id/status', updateUserStatus);
-
-router.get('/students', getStudentVerifications);
-router.put('/students/:id', reviewStudent);
 
 router.get('/providers', getProviderVerifications);
 router.put('/providers/:id', reviewProvider);

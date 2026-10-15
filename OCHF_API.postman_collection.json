@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "a1c4e92b-8e24-4f9a-8c77-94a123f89012",
-    "name": "OCHF API - Off-Campus Hostel Finder (Group 16)",
-    "description": "Postman Collection for Group 16 Capstone Project - Off-Campus Hostel Finder (OCHF) Backend API.\n\nCovers Auth, OTP Verification, Properties, Inspection Slots, Bookings, Transactions, Reviews, Reports, Admin Moderation, and Notifications.",
+    "_postman_id": "b2d5f03c-9f35-4e0b-9d88-05b234a90123",
+    "name": "OCHF API - Role-Based (Student, Landlord, Admin)",
+    "description": "Postman Collection for Group 16 Capstone Project - Off-Campus Hostel Finder (OCHF) Backend API.\n\nCategorized strictly by actor role: Student Endpoints, Landlord Endpoints, and Admin Endpoints. Common endpoints (such as Auth, OTP, Schools, Property details, Slots, and Reports) are duplicated and pre-configured with each role's tokens and context for seamless independent testing.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,6 +18,11 @@
     },
     {
       "key": "providerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "landlordToken",
       "value": "",
       "type": "string"
     },
@@ -84,2089 +89,2940 @@
   ],
   "item": [
     {
-      "name": "1. Authentication & OTP",
-      "description": "Registration, Login, User profile, and Student email OTP verification",
+      "name": "1. Student Endpoints",
+      "description": "Endpoints used by Students: registration, login, profile, OTP verification, browsing schools & hostels, booking inspection slots, managing decisions, viewing rent transactions, posting reviews, and reporting issues.",
       "item": [
         {
-          "name": "Register - Student",
-          "event": [
+          "name": "1.1 Authentication & Profile",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.token) {",
-                  "        pm.collectionVariables.set('studentToken', data.token);",
-                  "    }",
-                  "    if (data.user && data.user.id) {",
-                  "        pm.collectionVariables.set('userId', data.user.id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Register Student Account",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.token) {",
+                      "        pm.collectionVariables.set('studentToken', data.token);",
+                      "    }",
+                      "    if (data.user && data.user.id) {",
+                      "        pm.collectionVariables.set('userId', data.user.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"student@example.edu.ng\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"role\": \"student\",\n  \"fullName\": \"Jane Doe\",\n  \"phone\": \"+2348011223344\",\n  \"schoolId\": \"{{schoolId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "register"
+                  ]
+                },
+                "description": "Register a new student account. Returns JWT token and sets nextStep to otp_verification."
+              }
+            },
+            {
+              "name": "Login as Student",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.token) {",
+                      "        pm.collectionVariables.set('studentToken', data.token);",
+                      "    }",
+                      "    if (data.user && data.user.id) {",
+                      "        pm.collectionVariables.set('userId', data.user.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"student@example.edu.ng\",\n  \"password\": \"Password123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Authenticate student credentials and save token to {{studentToken}}."
+              }
+            },
+            {
+              "name": "Get Current Student Profile (/auth/me)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "me"
+                  ]
+                },
+                "description": "Fetch the authenticated student user profile and verification status."
+              }
+            },
+            {
+              "name": "Delete Student Account (/auth/me)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "me"
+                  ]
+                },
+                "description": "Permanently delete student account and linked profile. Requires current password for confirmation.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"Password123!\"\n}"
+                }
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"student@example.edu.ng\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"role\": \"student\",\n  \"fullName\": \"Jane Doe\",\n  \"phone\": \"+2348011223344\",\n  \"schoolId\": \"{{schoolId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
-            },
-            "description": "Register a new student. Returns JWT token and sets nextStep to 'otp_verification'."
-          }
+          ]
         },
         {
-          "name": "Register - Provider",
-          "event": [
+          "name": "1.2 OTP Email Verification",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.token) {",
-                  "        pm.collectionVariables.set('providerToken', data.token);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Send Student OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/send",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "send"
+                  ]
+                },
+                "description": "Send a fresh 6-digit OTP code to the registered student email."
+              }
+            },
+            {
+              "name": "Resend Student OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/resend",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "resend"
+                  ]
+                },
+                "description": "Resend OTP to student email (enforces 60-second cooldown and hourly rate limit)."
+              }
+            },
+            {
+              "name": "Verify Student OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/verify",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "verify"
+                  ]
+                },
+                "description": "Verify 6-digit OTP code to confirm student email."
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"landlord@example.com\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"role\": \"provider\",\n  \"businessName\": \"Prime Hostel Solutions\",\n  \"phone\": \"+2348099887766\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
-            },
-            "description": "Register a property provider/landlord."
-          }
+          ]
         },
         {
-          "name": "Login - Student",
-          "event": [
+          "name": "1.3 Institutions & Campuses",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.token) {",
-                  "        pm.collectionVariables.set('studentToken', data.token);",
-                  "    }",
-                  "    if (data.user && data.user.id) {",
-                  "        pm.collectionVariables.set('userId', data.user.id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Browse All Registered Universities / Poly-Campuses",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    pm.test(\"Status code is 200\", function () {",
+                      "        pm.response.to.have.status(200);",
+                      "    });",
+                      "    if (data.schools && data.schools.length > 0) {",
+                      "        pm.collectionVariables.set(\"schoolId\", data.schools[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/schools?q=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "Optional search keyword (e.g. unilag, yaba, ibadan)"
+                    }
+                  ]
+                },
+                "description": "List tertiary institutions and coordinates. Saves first school ID to {{schoolId}}."
+              }
+            },
+            {
+              "name": "Get University / Campus Details by ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"School has location coordinates\", function () {",
+                      "    var data = pm.response.json();",
+                      "    pm.expect(data.school).to.have.property(\"location\");",
+                      "    pm.expect(data.school.location.coordinates).to.be.an(\"array\").with.lengthOf(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/schools/{{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools",
+                    "{{schoolId}}"
+                  ]
+                },
+                "description": "Retrieve details and geo-coordinates for a specific school."
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"student@example.edu.ng\",\n  \"password\": \"Password123!\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "description": "Authenticate student and save token to {{studentToken}}."
-          }
+          ]
         },
         {
-          "name": "Login - Provider",
-          "event": [
+          "name": "1.4 Hostel Search & Listings",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.token) {",
-                  "        pm.collectionVariables.set('providerToken', data.token);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Search Hostels (Distance to Campus, Price, Amenities)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/properties?minPrice=50000&maxPrice=350000&schoolId={{schoolId}}&maxDistanceKm=10&amenities=wifi,water&propertyType=self_contain&availability=available&sort=price_asc&page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties"
+                  ],
+                  "query": [
+                    {
+                      "key": "minPrice",
+                      "value": "50000"
+                    },
+                    {
+                      "key": "maxPrice",
+                      "value": "350000"
+                    },
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    },
+                    {
+                      "key": "maxDistanceKm",
+                      "value": "10"
+                    },
+                    {
+                      "key": "amenities",
+                      "value": "wifi,water"
+                    },
+                    {
+                      "key": "propertyType",
+                      "value": "self_contain"
+                    },
+                    {
+                      "key": "availability",
+                      "value": "available"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "price_asc"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Search available student hostels near chosen school with geo-distance calculation, budget filter, and amenities."
+              }
+            },
+            {
+              "name": "Get Hostel Details by ID (Shielded Contact)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties/{{propertyId}}?schoolId={{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "{{propertyId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    }
+                  ]
+                },
+                "description": "Fetch complete hostel information. Contact info is shielded unless student is verified."
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"landlord@example.com\",\n  \"password\": \"Password123!\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "description": "Authenticate provider and save token to {{providerToken}}."
-          }
+          ]
         },
         {
-          "name": "Login - Admin",
-          "event": [
+          "name": "1.5 Inspection Slots",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.token) {",
-                  "        pm.collectionVariables.set('adminToken', data.token);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get Open Inspection Slots for Hostel",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.slots && data.slots.length > 0) {",
+                      "        pm.collectionVariables.set('slotId', data.slots[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/slots/property/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "slots",
+                    "property",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "Retrieve all available, open inspection time slots for a given property."
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@ochf.com\",\n  \"password\": \"AdminPassword123!\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "description": "Authenticate admin and save token to {{adminToken}}."
-          }
+          ]
         },
         {
-          "name": "Get Current Account (/auth/me)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/me",
-              "host": [
-                "{{baseUrl}}"
+          "name": "1.6 Inspections & Bookings",
+          "item": [
+            {
+              "name": "Book Inspection Slot (Verified Student)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.inspection && data.inspection._id) {",
+                      "        pm.collectionVariables.set('inspectionId', data.inspection._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "auth",
-                "me"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"slotId\": \"{{slotId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections"
+                  ]
+                },
+                "description": "Book an open inspection slot for a verified hostel. Automatically confirms booking."
+              }
             },
-            "description": "Returns profile and verification status of currently authenticated user."
-          }
+            {
+              "name": "Get My Booked Inspections",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "mine"
+                  ]
+                },
+                "description": "Retrieve all inspection requests and scheduled visits booked by the logged-in student."
+              }
+            },
+            {
+              "name": "Get Inspection Details by ID (Student)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}"
+                  ]
+                },
+                "description": "Retrieve full details of an inspection booking where the student is a participant."
+              }
+            },
+            {
+              "name": "Submit Decision - Accept Hostel (Create Transaction)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.transaction && data.transaction._id) {",
+                      "        pm.collectionVariables.set('transactionId', data.transaction._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"decision\": \"accepted\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decision",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "decision"
+                  ]
+                },
+                "description": "Accept the hostel after viewing. Automatically initializes rent transaction."
+              }
+            },
+            {
+              "name": "Submit Decision - Reject Hostel",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"decision\": \"rejected\",\n  \"reason\": \"Compound road gets waterlogged during rain.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decision",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "decision"
+                  ]
+                },
+                "description": "Reject hostel after inspection with feedback reason."
+              }
+            },
+            {
+              "name": "Cancel Inspection Booking",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}"
+                  ]
+                },
+                "description": "Cancel a pending or confirmed inspection booking."
+              }
+            }
+          ]
         },
         {
-          "name": "Send Student OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
+          "name": "1.7 Transactions & Rent Records",
+          "item": [
+            {
+              "name": "Get My Transactions (Student)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "mine"
+                  ]
+                },
+                "description": "View list of all accommodation payment transactions for the student."
               }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/otp/send",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "otp",
-                "send"
-              ]
             },
-            "description": "Dispatches 6-digit email OTP (TTL: 10 mins). In development, code is logged to the server console."
-          }
+            {
+              "name": "Get Transaction Details by ID (Student)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/{{transactionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "{{transactionId}}"
+                  ]
+                },
+                "description": "Retrieve status and breakdown of a specific transaction."
+              }
+            },
+            {
+              "name": "Update Transaction Status (Student / Mock Pay)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/{{transactionId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "{{transactionId}}",
+                    "status"
+                  ]
+                },
+                "description": "Update the transaction state (e.g. mark payment in_progress or completed)."
+              }
+            }
+          ]
         },
         {
-          "name": "Resend Student OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/otp/resend",
-              "host": [
-                "{{baseUrl}}"
+          "name": "1.8 Reviews & Ratings",
+          "item": [
+            {
+              "name": "Create Hostel Review (Accepted Inspection Required)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.review && data.review._id) {",
+                      "        pm.collectionVariables.set('reviewId', data.review._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "auth",
-                "otp",
-                "resend"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"rating\": 5,\n  \"comment\": \"Top notch hostel! Power supply is steady and landlord was very responsive.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/reviews",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews"
+                  ]
+                },
+                "description": "Leave rating (1-5) and feedback comment for a hostel after completed accepted inspection."
+              }
             },
-            "description": "Resend verification code (subject to 60-second cooldown and max 5 sends/hour)."
-          }
+            {
+              "name": "Get My Submitted Reviews",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/reviews/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews",
+                    "mine"
+                  ]
+                },
+                "description": "List all property reviews submitted by the logged-in student."
+              }
+            },
+            {
+              "name": "Get Property Reviews (Public / Student View)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/reviews/property/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews",
+                    "property",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "View ratings and tenant reviews for a given hostel."
+              }
+            },
+            {
+              "name": "Update My Review",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Solid accommodation. Minor issue with the water pumping machine fixed promptly.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/reviews/{{reviewId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews",
+                    "{{reviewId}}"
+                  ]
+                },
+                "description": "Edit a review previously written by the student."
+              }
+            },
+            {
+              "name": "Delete My Review",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/reviews/{{reviewId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews",
+                    "{{reviewId}}"
+                  ]
+                },
+                "description": "Remove a review written by the student."
+              }
+            }
+          ]
         },
         {
-          "name": "Verify Student OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"code\": \"123456\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/otp/verify",
-              "host": [
-                "{{baseUrl}}"
+          "name": "1.9 Reports & Moderation Flags",
+          "item": [
+            {
+              "name": "Submit Report / Complaint (Student)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.report && data.report._id) {",
+                      "        pm.collectionVariables.set('reportId', data.report._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "auth",
-                "otp",
-                "verify"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"reason\": \"Listing advertises 24hr electricity but area experiences regular outages without backup generator.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/reports",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reports"
+                  ]
+                },
+                "description": "Submit a moderation flag or complaint regarding a misleading hostel listing or landlord behavior."
+              }
             },
-            "description": "Submit 6-digit OTP to verify email. If OTP_AUTO_VERIFY is enabled, marks student profile as verified."
-          }
+            {
+              "name": "Get My Filed Reports (Student)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{studentToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/reports/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reports",
+                    "mine"
+                  ]
+                },
+                "description": "List all reports and complaints submitted by the student."
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "2. Properties",
-      "description": "Listing creation, distance computation, search, filtering, and detail endpoints",
+      "name": "2. Landlord Endpoints",
+      "description": "Endpoints used by Landlords / Providers: account registration & login, OTP verification, campus browsing, listing and managing hostel properties, generating inspection slots, reviewing & completing student inspection visits, tracking rent transactions, and viewing property feedback.",
       "item": [
         {
-          "name": "Browse / Search Properties (Public)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/properties?minPrice=50000&maxPrice=350000&schoolId={{schoolId}}&maxDistanceKm=10&amenities=wifi,water&propertyType=self_contain&availability=available&sort=price_asc&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "properties"
-              ],
-              "query": [
-                {
-                  "key": "minPrice",
-                  "value": "50000"
-                },
-                {
-                  "key": "maxPrice",
-                  "value": "350000"
-                },
-                {
-                  "key": "schoolId",
-                  "value": "{{schoolId}}"
-                },
-                {
-                  "key": "maxDistanceKm",
-                  "value": "10"
-                },
-                {
-                  "key": "amenities",
-                  "value": "wifi,water"
-                },
-                {
-                  "key": "propertyType",
-                  "value": "self_contain"
-                },
-                {
-                  "key": "availability",
-                  "value": "available"
-                },
-                {
-                  "key": "sort",
-                  "value": "price_asc"
-                },
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
-            "description": "Public listing search with distance calculation, driving time estimate, and multi-criteria filters."
-          }
-        },
-        {
-          "name": "Get Property by ID (Public / Shielded)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}",
-                "disabled": false
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/properties/{{propertyId}}?schoolId={{schoolId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "properties",
-                "{{propertyId}}"
-              ],
-              "query": [
-                {
-                  "key": "schoolId",
-                  "value": "{{schoolId}}"
-                }
-              ]
-            },
-            "description": "Fetches single property. Landlord phone is shielded; landlord business name is revealed only to verified students."
-          }
-        },
-        {
-          "name": "Create Property (Provider)",
-          "event": [
+          "name": "2.1 Authentication & Profile",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.property && data.property._id) {",
-                  "        pm.collectionVariables.set('propertyId', data.property._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Register Landlord / Provider Account",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.token) {",
+                      "        pm.collectionVariables.set(\"providerToken\", data.token);",
+                      "        pm.collectionVariables.set(\"landlordToken\", data.token);",
+                      "    }",
+                      "    if (data.user && data.user.id) {",
+                      "        pm.collectionVariables.set(\"userId\", data.user.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"landlord@example.com\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"role\": \"provider\",\n  \"businessName\": \"Prime Hostel Solutions\",\n  \"phone\": \"+2348099887766\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "register"
+                  ]
+                },
+                "description": "Register a property provider / landlord account."
+              }
+            },
+            {
+              "name": "Login as Landlord / Provider",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.token) {",
+                      "        pm.collectionVariables.set(\"providerToken\", data.token);",
+                      "        pm.collectionVariables.set(\"landlordToken\", data.token);",
+                      "    }",
+                      "    if (data.user && data.user.id) {",
+                      "        pm.collectionVariables.set(\"userId\", data.user.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"landlord@example.com\",\n  \"password\": \"Password123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Authenticate landlord credentials and save token to {{providerToken}} & {{landlordToken}}."
+              }
+            },
+            {
+              "name": "Get Current Landlord Profile (/auth/me)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "me"
+                  ]
+                },
+                "description": "Fetch the authenticated landlord user profile and provider verification status."
+              }
+            },
+            {
+              "name": "Delete Landlord Account (/auth/me)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "me"
+                  ]
+                },
+                "description": "Permanently delete landlord account and linked provider profile. Requires current password.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"Password123!\"\n}"
+                }
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"University View Luxury Studio\",\n  \"description\": \"Modern self-contained apartment with tiled floors, balcony, clean water, and dedicated transformer.\",\n  \"price\": 220000,\n  \"additionalCharges\": [\n    {\n      \"name\": \"Caution fee\",\n      \"amount\": 25000\n    },\n    {\n      \"name\": \"Waste & Security\",\n      \"amount\": 15000\n    }\n  ],\n  \"photos\": [\n    {\n      \"url\": \"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267\",\n      \"order\": 0\n    },\n    {\n      \"url\": \"https://images.unsplash.com/photo-1502672260266-1c1ef2d93688\",\n      \"order\": 1\n    }\n  ],\n  \"amenities\": [\n    \"wifi\",\n    \"water\",\n    \"generator\",\n    \"security\",\n    \"cctv\"\n  ],\n  \"address\": \"15 University Crescent, Akoka, Lagos\",\n  \"latitude\": 6.5185,\n  \"longitude\": 3.3892,\n  \"propertyType\": \"self_contain\",\n  \"schoolId\": \"{{schoolId}}\",\n  \"availabilityStatus\": \"available\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/properties",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "properties"
-              ]
-            },
-            "description": "Creates listing. Auto-calculates distanceFromSchoolKm and drivingTimeMinutes. Automatically generates default open inspection slots for upcoming weekdays (2-3 PM, 4-5 PM, 5-6 PM, 6-7 PM). Saves ID to {{propertyId}}."
-          }
+          ]
         },
         {
-          "name": "Get My Properties (Provider)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
+          "name": "2.2 OTP Email Verification",
+          "item": [
+            {
+              "name": "Send Landlord OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/send",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "send"
+                  ]
+                },
+                "description": "Send a fresh 6-digit OTP code to the registered landlord email."
               }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/properties/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "properties",
-                "mine"
-              ]
             },
-            "description": "Provider fetches all properties they own regardless of verification status."
-          }
+            {
+              "name": "Resend Landlord OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/resend",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "resend"
+                  ]
+                },
+                "description": "Resend OTP to landlord email (enforces 60-second cooldown and hourly rate limit)."
+              }
+            },
+            {
+              "name": "Verify Landlord OTP Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/otp/verify",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "otp",
+                    "verify"
+                  ]
+                },
+                "description": "Verify 6-digit OTP code to confirm landlord email."
+              }
+            }
+          ]
         },
         {
-          "name": "Update Property (Provider / Owner)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"University View Luxury Studio (Renovated)\",\n  \"price\": 230000,\n  \"amenities\": [\n    \"wifi\",\n    \"water\",\n    \"generator\",\n    \"security\",\n    \"cctv\",\n    \"balcony\"\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/properties/{{propertyId}}",
-              "host": [
-                "{{baseUrl}}"
+          "name": "2.3 Institutions & Campuses",
+          "item": [
+            {
+              "name": "Browse Campuses (Select School for Property Listing)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    pm.test(\"Status code is 200\", function () {",
+                      "        pm.response.to.have.status(200);",
+                      "    });",
+                      "    if (data.schools && data.schools.length > 0) {",
+                      "        pm.collectionVariables.set(\"schoolId\", data.schools[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "properties",
-                "{{propertyId}}"
-              ]
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/schools?q=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "Optional search keyword (e.g. unilag, yaba, ibadan)"
+                    }
+                  ]
+                },
+                "description": "View registered tertiary institutions to link property listings to a campus."
+              }
             },
-            "description": "Update property details. Note: editing core listing details sends status back to 'pending' for re-verification."
-          }
+            {
+              "name": "Get Campus Coordinates by ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"School has location coordinates\", function () {",
+                      "    var data = pm.response.json();",
+                      "    pm.expect(data.school).to.have.property(\"location\");",
+                      "    pm.expect(data.school.location.coordinates).to.be.an(\"array\").with.lengthOf(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/schools/{{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools",
+                    "{{schoolId}}"
+                  ]
+                },
+                "description": "Retrieve campus details to compute proximity and walking/driving distance."
+              }
+            }
+          ]
         },
         {
-          "name": "Delete Property (Provider / Owner)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/properties/{{propertyId}}",
-              "host": [
-                "{{baseUrl}}"
+          "name": "2.4 Property Management",
+          "item": [
+            {
+              "name": "Create New Property Listing",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.property && data.property._id) {",
+                      "        pm.collectionVariables.set('propertyId', data.property._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "properties",
-                "{{propertyId}}"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"University View Luxury Studio\",\n  \"description\": \"Modern self-contained apartment with tiled floors, balcony, clean water, and dedicated transformer.\",\n  \"price\": 220000,\n  \"additionalCharges\": [\n    {\n      \"name\": \"Caution fee\",\n      \"amount\": 25000\n    },\n    {\n      \"name\": \"Waste & Security\",\n      \"amount\": 15000\n    }\n  ],\n  \"photos\": [\n    {\n      \"url\": \"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267\",\n      \"order\": 0\n    },\n    {\n      \"url\": \"https://images.unsplash.com/photo-1502672260266-1c1ef2d93688\",\n      \"order\": 1\n    }\n  ],\n  \"amenities\": [\n    \"wifi\",\n    \"water\",\n    \"generator\",\n    \"security\",\n    \"cctv\"\n  ],\n  \"address\": \"15 University Crescent, Akoka, Lagos\",\n  \"latitude\": 6.5185,\n  \"longitude\": 3.3892,\n  \"propertyType\": \"self_contain\",\n  \"schoolId\": \"{{schoolId}}\",\n  \"availabilityStatus\": \"available\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/properties",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties"
+                  ]
+                },
+                "description": "Publish a new hostel listing linked to a campus with photos, pricing, amenities, and location."
+              }
             },
-            "description": "Deletes the listing owned by the provider."
-          }
+            {
+              "name": "Get My Listed Properties",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "mine"
+                  ]
+                },
+                "description": "Retrieve all hostel listings owned and managed by the logged-in landlord."
+              }
+            },
+            {
+              "name": "Get Property Details by ID (Landlord View)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties/{{propertyId}}?schoolId={{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "{{propertyId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    }
+                  ]
+                },
+                "description": "Retrieve full property listing details."
+              }
+            },
+            {
+              "name": "Browse Platform Properties (Market & Pricing Comparison)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/properties?minPrice=50000&maxPrice=350000&schoolId={{schoolId}}&maxDistanceKm=10&amenities=wifi,water&propertyType=self_contain&availability=available&sort=price_asc&page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties"
+                  ],
+                  "query": [
+                    {
+                      "key": "minPrice",
+                      "value": "50000"
+                    },
+                    {
+                      "key": "maxPrice",
+                      "value": "350000"
+                    },
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    },
+                    {
+                      "key": "maxDistanceKm",
+                      "value": "10"
+                    },
+                    {
+                      "key": "amenities",
+                      "value": "wifi,water"
+                    },
+                    {
+                      "key": "propertyType",
+                      "value": "self_contain"
+                    },
+                    {
+                      "key": "availability",
+                      "value": "available"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "price_asc"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Browse other platform listings for market intelligence, pricing benchmarks, and competitor analysis."
+              }
+            },
+            {
+              "name": "Update Property Listing (Owner)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"University View Luxury Studio (Renovated)\",\n  \"price\": 230000,\n  \"amenities\": [\n    \"wifi\",\n    \"water\",\n    \"generator\",\n    \"security\",\n    \"cctv\",\n    \"balcony\"\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/properties/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "Modify title, price, description, amenities, or availability of an existing listing."
+              }
+            },
+            {
+              "name": "Delete Property Listing (Owner)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "Permanently remove a property listing from the platform."
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.5 Inspection Slots Management",
+          "item": [
+            {
+              "name": "Create Inspection Slots from Availability Windows",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.slots && data.slots.length > 0) {",
+                      "        pm.collectionVariables.set('slotId', data.slots[0]._id);",
+                      "        if (data.slots.length > 1) {",
+                      "            pm.collectionVariables.set('newSlotId', data.slots[1]._id);",
+                      "        }",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"slotMinutes\": 30,\n  \"windows\": [\n    {\n      \"start\": \"2026-10-20T10:00:00+01:00\",\n      \"end\": \"2026-10-20T12:00:00+01:00\"\n    },\n    {\n      \"start\": \"2026-10-21T14:00:00+01:00\",\n      \"end\": \"2026-10-21T16:00:00+01:00\"\n    }\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/slots",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "slots"
+                  ]
+                },
+                "description": "Generate granular 30-minute inspection slots from start/end availability windows."
+              }
+            },
+            {
+              "name": "Get My Generated Inspection Slots",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/slots/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "slots",
+                    "mine"
+                  ]
+                },
+                "description": "View all inspection slots created across all owned properties."
+              }
+            },
+            {
+              "name": "Get Open Slots for Property (Landlord Check)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.slots && data.slots.length > 0) {",
+                      "        pm.collectionVariables.set('slotId', data.slots[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/slots/property/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "slots",
+                    "property",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "View current open slots for a specific property."
+              }
+            },
+            {
+              "name": "Delete Inspection Slot",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/slots/{{slotId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "slots",
+                    "{{slotId}}"
+                  ]
+                },
+                "description": "Delete an unbooked inspection slot."
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.6 Inspections & Bookings Handling",
+          "item": [
+            {
+              "name": "Get Received Inspection Bookings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/received",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "received"
+                  ]
+                },
+                "description": "Retrieve all inspection requests and scheduled visits booked by students on landlord properties."
+              }
+            },
+            {
+              "name": "Get Inspection Details by ID (Landlord)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}"
+                  ]
+                },
+                "description": "Retrieve complete details of an inspection booking on landlord property."
+              }
+            },
+            {
+              "name": "Schedule / Confirm Inspection Date",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"scheduledAt\": \"2026-10-20T10:30:00+01:00\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/schedule",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "schedule"
+                  ]
+                },
+                "description": "Confirm or set specific inspection timestamp."
+              }
+            },
+            {
+              "name": "Decline Inspection Booking",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Property is currently undergoing electrical repair.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decline",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "decline"
+                  ]
+                },
+                "description": "Decline an inspection request with a reason."
+              }
+            },
+            {
+              "name": "Reschedule Inspection Booking",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slotId\": \"{{newSlotId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/reschedule",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "reschedule"
+                  ]
+                },
+                "description": "Reschedule an inspection booking to another available slot."
+              }
+            },
+            {
+              "name": "Mark Inspection as Completed",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/complete",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "complete"
+                  ]
+                },
+                "description": "Mark inspection as successfully conducted after student visits property."
+              }
+            },
+            {
+              "name": "Mark Inspection as Missed (Student No-Show)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/inspections/{{inspectionId}}/missed",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "inspections",
+                    "{{inspectionId}}",
+                    "missed"
+                  ]
+                },
+                "description": "Mark inspection as missed if student failed to arrive."
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.7 Transactions & Received Payments",
+          "item": [
+            {
+              "name": "Get Received Transactions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/received",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "received"
+                  ]
+                },
+                "description": "View list of rent payment transactions received from students."
+              }
+            },
+            {
+              "name": "Get Transaction Details by ID (Landlord)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/{{transactionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "{{transactionId}}"
+                  ]
+                },
+                "description": "Retrieve breakdown and status of an incoming transaction."
+              }
+            },
+            {
+              "name": "Update Transaction Status (Landlord)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/transactions/{{transactionId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "transactions",
+                    "{{transactionId}}",
+                    "status"
+                  ]
+                },
+                "description": "Update transaction state (e.g. acknowledge receipt or update status)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.8 Property Reviews & Feedback",
+          "item": [
+            {
+              "name": "Get Property Reviews (Inspect Tenant Feedback)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/reviews/property/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reviews",
+                    "property",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "View reviews and ratings submitted by students on landlord property."
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.9 Reports & Moderation Flags",
+          "item": [
+            {
+              "name": "Submit Report / Complaint (Landlord)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.report && data.report._id) {",
+                      "        pm.collectionVariables.set('reportId', data.report._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"reason\": \"Student booked inspection slot and behaved inappropriately or failed to follow house rules.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/reports",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reports"
+                  ]
+                },
+                "description": "Submit a moderation report against a student or problematic transaction."
+              }
+            },
+            {
+              "name": "Get My Filed Reports (Landlord)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{providerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/reports/mine",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reports",
+                    "mine"
+                  ]
+                },
+                "description": "List all reports and complaints submitted by the landlord."
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "3. Inspection Slots",
-      "description": "Availability windows, slot generation, and slot queries",
+      "name": "3. Admin Endpoints",
+      "description": "Endpoints used by Platform Administrators: authentication, user management, student verifications, landlord verifications, property listing moderation, inspection oversight, dispute resolution, school management, and diagnostic email broadcasting.",
       "item": [
         {
-          "name": "Create Slots from Windows (Provider)",
-          "event": [
+          "name": "3.1 Authentication & Profile",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.slots && data.slots.length > 0) {",
-                  "        pm.collectionVariables.set('slotId', data.slots[0]._id);",
-                  "        if (data.slots.length > 1) {",
-                  "            pm.collectionVariables.set('newSlotId', data.slots[1]._id);",
-                  "        }",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"slotMinutes\": 30,\n  \"windows\": [\n    {\n      \"start\": \"2026-10-20T10:00:00+01:00\",\n      \"end\": \"2026-10-20T12:00:00+01:00\"\n    },\n    {\n      \"start\": \"2026-10-21T14:00:00+01:00\",\n      \"end\": \"2026-10-21T16:00:00+01:00\"\n    }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/slots",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "slots"
-              ]
-            },
-            "description": "Provider enters availability windows. Server breaks them into 30-minute bookable slots."
-          }
-        },
-        {
-          "name": "Get My Slots (Provider)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/slots/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "slots",
-                "mine"
-              ]
-            },
-            "description": "Retrieves all slots published by this provider."
-          }
-        },
-        {
-          "name": "Get Open Slots for Property (Student / Provider / Admin)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.slots && data.slots.length > 0) {",
-                  "        pm.collectionVariables.set('slotId', data.slots[0]._id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/slots/property/{{propertyId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "slots",
-                "property",
-                "{{propertyId}}"
-              ]
-            },
-            "description": "Student, provider, or admin views bookable open slots for an upcoming inspection. Returns total count, raw slots array, and groupedByDate formatted for the date & time selector UI."
-          }
-        },
-        {
-          "name": "Delete Slot (Provider)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/slots/{{slotId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "slots",
-                "{{slotId}}"
-              ]
-            },
-            "description": "Removes an unbooked availability slot."
-          }
-        }
-      ]
-    },
-    {
-      "name": "4. Inspections & Bookings",
-      "description": "Booking slots, schedule management, attendance tracking, and accept/reject decisions",
-      "item": [
-        {
-          "name": "Book Inspection Slot (Verified Student)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.inspection && data.inspection._id) {",
-                  "        pm.collectionVariables.set('inspectionId', data.inspection._id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"slotId\": \"{{slotId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections"
-              ]
-            },
-            "description": "Atomically claims the chosen slot and creates an inspection booking with status 'requested' awaiting administrator approval. Triggers email notification."
-          }
-        },
-        {
-          "name": "Get My Inspections (Student)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "mine"
-              ]
-            },
-            "description": "Student views all inspection bookings they have placed."
-          }
-        },
-        {
-          "name": "Get Received Inspections (Provider)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/received",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "received"
-              ]
-            },
-            "description": "Provider views all inspection bookings across properties they manage."
-          }
-        },
-        {
-          "name": "Get Inspection by ID (Participant)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}"
-              ]
-            },
-            "description": "Inspect details of a booking (student or provider)."
-          }
-        },
-        {
-          "name": "Schedule Inspection Date (Provider)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"scheduledAt\": \"2026-10-20T10:30:00+01:00\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/schedule",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "schedule"
-              ]
-            },
-            "description": "Move 'requested' inspection to 'confirmed' with scheduledAt timestamp."
-          }
-        },
-        {
-          "name": "Decline Inspection (Provider)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"Property is currently undergoing electrical repair.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decline",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "decline"
-              ]
-            },
-            "description": "Provider declines an inspection before confirmation."
-          }
-        },
-        {
-          "name": "Reschedule Inspection (Provider)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"slotId\": \"{{newSlotId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/reschedule",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "reschedule"
-              ]
-            },
-            "description": "Reschedule inspection by moving to a new open slot. Releases previous slot."
-          }
-        },
-        {
-          "name": "Complete Inspection (Provider)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/complete",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "complete"
-              ]
-            },
-            "description": "Provider marks inspection as attended/completed. Unlocks student's ability to accept/reject and review."
-          }
-        },
-        {
-          "name": "Mark Inspection as Missed (Provider)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/missed",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "missed"
-              ]
-            },
-            "description": "Provider marks inspection as missed when student or party fails to attend."
-          }
-        },
-        {
-          "name": "Submit Decision - Accept (Student)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.transaction && data.transaction._id) {",
-                  "        pm.collectionVariables.set('transactionId', data.transaction._id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"decision\": \"accepted\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decision",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "decision"
-              ]
-            },
-            "description": "Accepting creates a Transaction with total amount (rent + additional charges) and marks property as booked."
-          }
-        },
-        {
-          "name": "Submit Decision - Reject (Student)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"decision\": \"rejected\",\n  \"reason\": \"Compound road gets waterlogged during rain.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}/decision",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}",
-                "decision"
-              ]
-            },
-            "description": "Rejection leaves the property available for other students."
-          }
-        },
-        {
-          "name": "Cancel Inspection (Student)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "inspections",
-                "{{inspectionId}}"
-              ]
-            },
-            "description": "Student cancels booking before completion. Frees the booked slot back to 'open'."
-          }
-        }
-      ]
-    },
-    {
-      "name": "5. Transactions",
-      "description": "Payment and booking status lifecycle tracking",
-      "item": [
-        {
-          "name": "Get My Transactions (Student)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "mine"
-              ]
-            },
-            "description": "Student views all payment transactions linked to accepted inspections."
-          }
-        },
-        {
-          "name": "Get Received Transactions (Provider)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{providerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/received",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "received"
-              ]
-            },
-            "description": "Provider views incoming booking transactions."
-          }
-        },
-        {
-          "name": "Get Transaction by ID (Participant)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/{{transactionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "{{transactionId}}"
-              ]
-            },
-            "description": "Fetches details of a specific transaction."
-          }
-        },
-        {
-          "name": "Update Transaction Status (Participant)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"in_progress\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/transactions/{{transactionId}}/status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "{{transactionId}}",
-                "status"
-              ]
-            },
-            "description": "Transitions: pending -> in_progress/cancelled; in_progress -> completed/cancelled. Cancelling reopens property availability."
-          }
-        }
-      ]
-    },
-    {
-      "name": "6. Reviews & Ratings",
-      "description": "Verified student reviews and ratings for inspected properties",
-      "item": [
-        {
-          "name": "Create Review (Student - Accepted Inspection Required)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.review && data.review._id) {",
-                  "        pm.collectionVariables.set('reviewId', data.review._id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"rating\": 5,\n  \"comment\": \"Top notch hostel! Power supply is steady and landlord was very responsive.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/reviews",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviews"
-              ]
-            },
-            "description": "Enforces verified review policy: only students with an 'accepted' inspection can review."
-          }
-        },
-        {
-          "name": "Get Property Reviews (Public)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/reviews/property/{{propertyId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviews",
-                "property",
-                "{{propertyId}}"
-              ]
-            },
-            "description": "Returns all reviews and calculated average rating for a property."
-          }
-        },
-        {
-          "name": "Get My Reviews (Student)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/reviews/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviews",
-                "mine"
-              ]
-            },
-            "description": "List all reviews written by current student."
-          }
-        },
-        {
-          "name": "Update Review (Student / Author)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Solid accommodation. Minor issue with the water pumping machine fixed promptly.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/reviews/{{reviewId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviews",
-                "{{reviewId}}"
-              ]
-            },
-            "description": "Author updates their rating or review comment."
-          }
-        },
-        {
-          "name": "Delete Review (Student / Author)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/reviews/{{reviewId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviews",
-                "{{reviewId}}"
-              ]
-            },
-            "description": "Author deletes their review."
-          }
-        }
-      ]
-    },
-    {
-      "name": "7. Reports & Moderation Flags",
-      "description": "User reporting for misleading listings or fraudulent behavior",
-      "item": [
-        {
-          "name": "Create Report (Authenticated User)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.report && data.report._id) {",
-                  "        pm.collectionVariables.set('reportId', data.report._id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"propertyId\": \"{{propertyId}}\",\n  \"reason\": \"Listing advertises 24hr electricity but neighbors confirmed constant blackouts.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/reports",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reports"
-              ]
-            },
-            "description": "Submit a report against a property or transaction."
-          }
-        },
-        {
-          "name": "Get My Reports (Authenticated User)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{studentToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/reports/mine",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reports",
-                "mine"
-              ]
-            },
-            "description": "List all reports filed by the current user."
-          }
-        }
-      ]
-    },
-    {
-      "name": "8. Admin Management",
-      "description": "User moderation, student/provider verification approvals, listing queues, and platform analytics",
-      "item": [
-        {
-          "name": "Get All Users (Admin)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/users?role=student&status=active&q=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users"
-              ],
-              "query": [
+              "name": "Login as Administrator",
+              "event": [
                 {
-                  "key": "role",
-                  "value": "student"
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.token) {",
+                      "        pm.collectionVariables.set('adminToken', data.token);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@ochf.com\",\n  \"password\": \"AdminPassword123!\"\n}"
                 },
-                {
-                  "key": "status",
-                  "value": "active"
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
                 },
-                {
-                  "key": "q",
-                  "value": ""
-                }
-              ]
-            },
-            "description": "List all users with verification status and role filters."
-          }
-        },
-        {
-          "name": "Update User Account Status - Suspend/Activate (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
+                "description": "Authenticate admin credentials and save token to {{adminToken}}."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Multiple spam listings reported.\"\n}"
             },
-            "url": {
-              "raw": "{{baseUrl}}/admin/users/{{userId}}/status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                "{{userId}}",
-                "status"
-              ]
-            },
-            "description": "Suspends (or reactivates) account. Suspended users are immediately rejected by auth middleware."
-          }
-        },
-        {
-          "name": "Get Student Verifications Queue (Admin)",
-          "event": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.students && data.students.length > 0) {",
-                  "        pm.collectionVariables.set('studentProfileId', data.students[0]._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get Admin Profile (/auth/me)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "me"
+                  ]
+                },
+                "description": "Retrieve authenticated administrator account information."
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/students?status=pending",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "students"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "pending"
-                }
-              ]
-            },
-            "description": "Fetch pending student profile verifications."
-          }
+          ]
         },
         {
-          "name": "Review Student Verification - Approve / Reject (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"verified\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/students/{{studentProfileId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "students",
-                "{{studentProfileId}}"
-              ]
-            },
-            "description": "Approves ('verified') or rejects student verification document. Sends email notification."
-          }
-        },
-        {
-          "name": "Get Provider Verifications Queue (Admin)",
-          "event": [
+          "name": "3.2 User Management",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.providers && data.providers.length > 0) {",
-                  "        pm.collectionVariables.set('providerProfileId', data.providers[0]._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get All Platform Users (Filter by Role & Status)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users?role=student&status=active&q=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "role",
+                      "value": "student"
+                    },
+                    {
+                      "key": "status",
+                      "value": "active"
+                    },
+                    {
+                      "key": "q",
+                      "value": ""
+                    }
+                  ]
+                },
+                "description": "Paginated user directory with role, status, and query search filters."
+              }
+            },
+            {
+              "name": "Update User Account Status (Suspend / Activate)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Multiple spam listings reported.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/{{userId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    "{{userId}}",
+                    "status"
+                  ]
+                },
+                "description": "Suspend or reactivate a student, landlord, or admin account."
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/providers?status=pending",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "providers"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "pending"
-                }
-              ]
-            },
-            "description": "Fetch pending landlord accreditation and ID verifications."
-          }
+          ]
         },
         {
-          "name": "Review Provider Verification - Approve / Reject (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"verified\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/providers/{{providerProfileId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "providers",
-                "{{providerProfileId}}"
-              ]
-            },
-            "description": "Approves or rejects provider credentials."
-          }
-        },
-        {
-          "name": "Get Property Verifications Queue (Admin)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/properties?status=pending",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "properties"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "pending"
-                }
-              ]
-            },
-            "description": "Fetch pending property listings awaiting moderation before going live."
-          }
-        },
-        {
-          "name": "Review Property - Approve / Reject (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"verified\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/properties/{{propertyId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "properties",
-                "{{propertyId}}"
-              ]
-            },
-            "description": "Approve listing to appear in public search, or reject with a reason to request landlord corrections."
-          }
-        },
-        {
-          "name": "Get Inspections Queue - Pending (Admin)",
-          "event": [
+          "name": "3.3 Student Verification Queue",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    if (data.inspections && data.inspections.length > 0) {",
-                  "        pm.collectionVariables.set('inspectionId', data.inspections[0]._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get Student Verifications Queue (Pending)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.students && data.students.length > 0) {",
+                      "        pm.collectionVariables.set('studentProfileId', data.students[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/students?status=pending",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "students"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                },
+                "description": "List pending student profile verifications awaiting review."
+              }
+            },
+            {
+              "name": "Review Student Verification (Approve / Reject)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"verified\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/students/{{studentProfileId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "students",
+                    "{{studentProfileId}}"
+                  ]
+                },
+                "description": "Approve or reject a student verification application."
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/inspections?status=requested",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "inspections"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "requested"
-                }
-              ]
-            },
-            "description": "Fetch pending student inspection bookings awaiting administrator approval. Automatically saves first ID to {{inspectionId}}."
-          }
+          ]
         },
         {
-          "name": "Review Inspection - Approve (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"confirmed\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "inspections",
-                "{{inspectionId}}"
-              ]
-            },
-            "description": "Admin approves student inspection booking (moves status to 'confirmed'). Sends confirmation email notifications to student and landlord."
-          }
-        },
-        {
-          "name": "Review Inspection - Reject (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"rejected\",\n  \"reason\": \"Landlord unavailable or duplicate inspection request.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "inspections",
-                "{{inspectionId}}"
-              ]
-            },
-            "description": "Admin rejects inspection request (status -> 'rejected'). Automatically releases the slot back to 'open' so other students can select it, and notifies student and landlord."
-          }
-        },
-        {
-          "name": "Get All Platform Inspections (Admin)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/inspections?status=confirmed",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "inspections"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "confirmed"
-                }
-              ]
-            },
-            "description": "Platform-wide view of all inspection bookings (omit status or pass status=all to view all)."
-          }
-        },
-        {
-          "name": "Get Reports Queue (Admin)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/reports?status=open",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "reports"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "open"
-                }
-              ]
-            },
-            "description": "Fetch open dispute and fraud reports."
-          }
-        },
-        {
-          "name": "Update Report Status (Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"resolved\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/reports/{{reportId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "reports",
-                "{{reportId}}"
-              ]
-            },
-            "description": "Update report status to 'reviewed' or 'resolved'."
-          }
-        }
-      ]
-    },
-    {
-      "name": "9. Notifications & Diagnostics",
-      "description": "SMTP configuration tests and broadcast notifications",
-      "item": [
-        {
-          "name": "Send SMTP Test Email (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"to\": \"admin@example.com\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/notifications/test",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "notifications",
-                "test"
-              ]
-            },
-            "description": "Verify that SMTP credentials and outbound email dispatch are functioning properly."
-          }
-        },
-        {
-          "name": "Send System Announcement (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Scheduled Maintenance Notice\",\n  \"body\": \"OCHF platform will undergo a brief scheduled database update tonight at 02:00 AM.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/notifications/announce",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "notifications",
-                "announce"
-              ]
-            },
-            "description": "Send direct in-app and email announcement to a specific user."
-          }
-        }
-      ]
-    },
-    {
-      "name": "10. Schools & Campuses",
-      "description": "Public endpoints to list and view tertiary institutions (used as proximity anchors for hostel listings), plus admin creation of new campuses.",
-      "item": [
-        {
-          "name": "Get All Schools (Public)",
-          "event": [
+          "name": "3.4 Landlord / Provider Verification Queue",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var data = pm.response.json();",
-                  "    pm.test(\"Status code is 200\", function () {",
-                  "        pm.response.to.have.status(200);",
-                  "    });",
-                  "    if (data.schools && data.schools.length > 0) {",
-                  "        pm.collectionVariables.set(\"schoolId\", data.schools[0]._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get Provider Verifications Queue (Pending)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.providers && data.providers.length > 0) {",
+                      "        pm.collectionVariables.set('providerProfileId', data.providers[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/providers?status=pending",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "providers"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                },
+                "description": "List pending provider/landlord applications and business credentials awaiting verification."
+              }
+            },
+            {
+              "name": "Review Provider Verification (Approve / Reject)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"verified\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/providers/{{providerProfileId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "providers",
+                    "{{providerProfileId}}"
+                  ]
+                },
+                "description": "Approve or reject a provider/landlord account."
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/schools?q=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "schools"
-              ],
-              "query": [
+          ]
+        },
+        {
+          "name": "3.5 Property Verification & Audit",
+          "item": [
+            {
+              "name": "Get Property Verifications Queue (Pending)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/properties?status=pending",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "properties"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                },
+                "description": "List pending hostel listings awaiting moderation and approval."
+              }
+            },
+            {
+              "name": "Review Property Listing (Approve / Reject)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"verified\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/properties/{{propertyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "properties",
+                    "{{propertyId}}"
+                  ]
+                },
+                "description": "Approve or reject a property listing before it appears in public search."
+              }
+            },
+            {
+              "name": "Browse / Audit Platform Properties (Admin View)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties?minPrice=50000&maxPrice=350000&schoolId={{schoolId}}&maxDistanceKm=10&amenities=wifi,water&propertyType=self_contain&availability=available&sort=price_asc&page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties"
+                  ],
+                  "query": [
+                    {
+                      "key": "minPrice",
+                      "value": "50000"
+                    },
+                    {
+                      "key": "maxPrice",
+                      "value": "350000"
+                    },
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    },
+                    {
+                      "key": "maxDistanceKm",
+                      "value": "10"
+                    },
+                    {
+                      "key": "amenities",
+                      "value": "wifi,water"
+                    },
+                    {
+                      "key": "propertyType",
+                      "value": "self_contain"
+                    },
+                    {
+                      "key": "availability",
+                      "value": "available"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "price_asc"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Inspect live hostel listings across all campuses."
+              }
+            },
+            {
+              "name": "Get Property Details by ID (Admin Unshielded View)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/properties/{{propertyId}}?schoolId={{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "properties",
+                    "{{propertyId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "schoolId",
+                      "value": "{{schoolId}}"
+                    }
+                  ]
+                },
+                "description": "Inspect full property details including owner info."
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.6 Inspection Moderation & Oversight",
+          "item": [
+            {
+              "name": "Get Inspections Queue (Requested / Pending)",
+              "event": [
                 {
-                  "key": "q",
-                  "value": "",
-                  "description": "Optional search keyword (e.g. unilag, yaba, ibadan)"
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    if (data.inspections && data.inspections.length > 0) {",
+                      "        pm.collectionVariables.set('inspectionId', data.inspections[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
                 }
-              ]
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/inspections?status=requested",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "inspections"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "requested"
+                    }
+                  ]
+                },
+                "description": "List inspection bookings requiring admin moderation or review."
+              }
             },
-            "description": "Fetch all registered tertiary institutions. Automatically sets {{schoolId}} to the first returned campus."
-          }
-        },
-        {
-          "name": "Get School by ID (Public)",
-          "event": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"School has location coordinates\", function () {",
-                  "    var data = pm.response.json();",
-                  "    pm.expect(data.school).to.have.property(\"location\");",
-                  "    pm.expect(data.school.location.coordinates).to.be.an(\"array\").with.lengthOf(2);",
-                  "});"
-                ]
+              "name": "Review Inspection - Admin Approve Booking",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"confirmed\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "inspections",
+                    "{{inspectionId}}"
+                  ]
+                },
+                "description": "Admin override to confirm/approve an inspection booking."
+              }
+            },
+            {
+              "name": "Review Inspection - Admin Reject Booking",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"rejected\",\n  \"reason\": \"Landlord unavailable or duplicate inspection request.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/inspections/{{inspectionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "inspections",
+                    "{{inspectionId}}"
+                  ]
+                },
+                "description": "Admin override to reject an inspection booking with a reason."
+              }
+            },
+            {
+              "name": "Get All Platform Inspections (Filter by Status)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/inspections?status=confirmed",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "inspections"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "confirmed"
+                    }
+                  ]
+                },
+                "description": "Audit all platform inspections (requested, confirmed, completed, cancelled)."
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/schools/{{schoolId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "schools",
-                "{{schoolId}}"
-              ]
-            },
-            "description": "Fetch details, name, and GeoJSON coordinates for a specific school using {{schoolId}}."
-          }
+          ]
         },
         {
-          "name": "Create School (Admin)",
-          "event": [
+          "name": "3.7 Report & Dispute Moderation",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 201) {",
-                  "    var data = pm.response.json();",
-                  "    pm.test(\"Status code is 201\", function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
-                  "    if (data.school && data.school._id) {",
-                  "        pm.collectionVariables.set(\"schoolId\", data.school._id);",
-                  "    }",
-                  "}"
-                ]
+              "name": "Get Moderation Reports Queue (Open / Pending)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/reports?status=open",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "reports"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "open"
+                    }
+                  ]
+                },
+                "description": "List open user and listing reports flagged by students or landlords."
+              }
+            },
+            {
+              "name": "Update Report Status (Resolve / Dismiss / Investigating)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"resolved\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/reports/{{reportId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "reports",
+                    "{{reportId}}"
+                  ]
+                },
+                "description": "Resolve, dismiss, or mark report as under investigation."
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Covenant University (CU)\",\n  \"latitude\": 6.6718,\n  \"longitude\": 3.1581\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/schools",
-              "host": [
-                "{{baseUrl}}"
+          ]
+        },
+        {
+          "name": "3.8 School & Campus Management",
+          "item": [
+            {
+              "name": "Register New School / Campus",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var data = pm.response.json();",
+                      "    pm.test(\"Status code is 201\", function () {",
+                      "        pm.response.to.have.status(201);",
+                      "    });",
+                      "    if (data.school && data.school._id) {",
+                      "        pm.collectionVariables.set(\"schoolId\", data.school._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
               ],
-              "path": [
-                "schools"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Covenant University (CU)\",\n  \"latitude\": 6.6718,\n  \"longitude\": 3.1581\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/schools",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools"
+                  ]
+                },
+                "description": "Add a new tertiary institution with geo-coordinates (latitude and longitude)."
+              }
             },
-            "description": "Admin registers a new tertiary campus with geographical latitude & longitude. Automatically saves the created school ID to {{schoolId}}."
-          }
+            {
+              "name": "Get All Registered Schools (Admin)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var data = pm.response.json();",
+                      "    pm.test(\"Status code is 200\", function () {",
+                      "        pm.response.to.have.status(200);",
+                      "    });",
+                      "    if (data.schools && data.schools.length > 0) {",
+                      "        pm.collectionVariables.set(\"schoolId\", data.schools[0]._id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/schools?q=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "Optional search keyword (e.g. unilag, yaba, ibadan)"
+                    }
+                  ]
+                },
+                "description": "View all campuses currently configured in the database."
+              }
+            },
+            {
+              "name": "Get School Details by ID (Admin)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"School has location coordinates\", function () {",
+                      "    var data = pm.response.json();",
+                      "    pm.expect(data.school).to.have.property(\"location\");",
+                      "    pm.expect(data.school.location.coordinates).to.be.an(\"array\").with.lengthOf(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/schools/{{schoolId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "schools",
+                    "{{schoolId}}"
+                  ]
+                },
+                "description": "Retrieve details for a specific university/campus."
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.9 System Notifications & Diagnostics",
+          "item": [
+            {
+              "name": "Send SMTP Test Email (Diagnostic)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"to\": \"admin@example.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/notifications/test",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "notifications",
+                    "test"
+                  ]
+                },
+                "description": "Send test email to verify SMTP mail server connectivity."
+              }
+            },
+            {
+              "name": "Send Platform Announcement to User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Scheduled Maintenance Notice\",\n  \"body\": \"OCHF platform will undergo a brief scheduled database update tonight at 02:00 AM.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/notifications/announce",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "notifications",
+                    "announce"
+                  ]
+                },
+                "description": "Dispatch high-priority announcement email/in-app notification to a user."
+              }
+            }
+          ]
         }
       ]
     }
