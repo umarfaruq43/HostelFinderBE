@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { Property, ProviderProfile, StudentProfile, School } = require('../model/collectionsModel');
-const { generateDefaultSlots } = require('./slotController');
+const { generateDefaultSlots, generateSlotsFromWeeklySchedule } = require('./slotController');
 
 // Helper: fetch the ProviderProfile for the logged-in user
 async function getProviderProfile(userId) {
@@ -62,7 +62,8 @@ const PROPERTY_TYPES = ['room', 'self_contain', 'shared', 'apartment', 'hostel']
 // driving time are computed server-side and stored. availabilityStatus is
 // optional (defaults to 'available'). Amenities/charges/photos are optional.
 // body: { title, description, price, schoolId, additionalCharges[], photos[],
-//         amenities[], address, latitude, longitude, propertyType, availabilityStatus }
+//         amenities[], address, latitude, longitude, propertyType, availabilityStatus,
+//         proofOfOwnershipUrl, inspectionAvailability }
 async function createProperty(req, res) {
   try {
     const provider = await getProviderProfile(req.user._id);
@@ -73,11 +74,12 @@ async function createProperty(req, res) {
     const {
       title, description, price, additionalCharges, photos, amenities,
       address, latitude, longitude, propertyType, schoolId, availabilityStatus,
+      proofOfOwnershipUrl, inspectionAvailability,
     } = req.body;
 
-    if (!title || price == null || price === '' || !address || latitude == null || longitude == null || !schoolId) {
+    if (!title || price == null || price === '' || !address || !schoolId) {
       return res.status(400).json({
-        message: 'title, price, address, schoolId, latitude and longitude are required',
+        message: 'title, price, address and schoolId are required',
       });
     }
 
@@ -86,10 +88,23 @@ async function createProperty(req, res) {
       return res.status(400).json({ message: 'price must be a positive number' });
     }
 
-    const lat = Number(latitude);
-    const lng = Number(longitude);
+    if (!mongoose.isValidObjectId(schoolId)) {
+      return res.status(400).json({ message: 'Invalid schoolId' });
+    }
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ message: 'School not found' });
+    }
+
+    let lat = Number(latitude);
+    let lng = Number(longitude);
     if (!validCoords(lat, lng)) {
-      return res.status(400).json({ message: 'latitude/longitude are invalid' });
+      if (school.location && Array.isArray(school.location.coordinates) && school.location.coordinates.length === 2) {
+        lng = school.location.coordinates[0];
+        lat = school.location.coordinates[1];
+      } else {
+        return res.status(400).json({ message: 'latitude/longitude are invalid' });
+      }
     }
 
     if (propertyType !== undefined && !PROPERTY_TYPES.includes(propertyType)) {
@@ -105,14 +120,6 @@ async function createProperty(req, res) {
       return res.status(400).json({ message: 'amenities must be an array of strings' });
     }
 
-    if (!mongoose.isValidObjectId(schoolId)) {
-      return res.status(400).json({ message: 'Invalid schoolId' });
-    }
-    const school = await School.findById(schoolId);
-    if (!school) {
-      return res.status(404).json({ message: 'School not found' });
-    }
-
     const property = await Property.create({
       providerId: provider._id,
       title,
@@ -121,6 +128,8 @@ async function createProperty(req, res) {
       price: rent,
       additionalCharges: additionalCharges || [],
       photos: photos || [],
+      proofOfOwnershipUrl: proofOfOwnershipUrl || '',
+      inspectionAvailability: Array.isArray(inspectionAvailability) ? inspectionAvailability : [],
       amenities: cleanAmenities || [],
       address,
       location: { type: 'Point', coordinates: [lng, lat] },
@@ -130,10 +139,18 @@ async function createProperty(req, res) {
       // verificationStatus defaults to 'pending' — goes to the admin queue (US-17)
     });
 
-    // Automatically generate open inspection slots for this new property listing
-    const defaultSlots = await generateDefaultSlots(property._id, provider._id);
+    // Automatically generate inspection slots:
+    // If weekly availability schedule is provided, generate from schedule; otherwise standard default slots
+    let slotsCreated = 0;
+    if (Array.isArray(inspectionAvailability) && inspectionAvailability.some((d) => d && (d.isAvailable === true || d.isAvailable === 'true'))) {
+      const slots = await generateSlotsFromWeeklySchedule(property._id, provider._id, inspectionAvailability);
+      slotsCreated = slots.length;
+    } else {
+      const defaultSlots = await generateDefaultSlots(property._id, provider._id);
+      slotsCreated = defaultSlots.length;
+    }
 
-    return res.status(201).json({ property, slotsCreated: defaultSlots.length });
+    return res.status(201).json({ property, slotsCreated });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to create property', error: err.message });
   }
@@ -369,6 +386,7 @@ async function updateProperty(req, res) {
     const {
       title, description, price, additionalCharges, photos, amenities,
       address, latitude, longitude, availabilityStatus, propertyType, schoolId,
+      proofOfOwnershipUrl, inspectionAvailability,
     } = req.body;
 
     if (propertyType !== undefined && !PROPERTY_TYPES.includes(propertyType)) {
@@ -411,6 +429,13 @@ async function updateProperty(req, res) {
     if (cleanAmenities !== undefined) property.amenities = cleanAmenities;
     if (address !== undefined) property.address = address;
     if (availabilityStatus !== undefined) property.availabilityStatus = availabilityStatus;
+    if (proofOfOwnershipUrl !== undefined) property.proofOfOwnershipUrl = proofOfOwnershipUrl;
+    if (inspectionAvailability !== undefined) {
+      property.inspectionAvailability = inspectionAvailability;
+      if (Array.isArray(inspectionAvailability) && inspectionAvailability.some((d) => d && (d.isAvailable === true || d.isAvailable === 'true'))) {
+        await generateSlotsFromWeeklySchedule(property._id, provider._id, inspectionAvailability);
+      }
+    }
     if (coordsChanged) {
       property.location = { type: 'Point', coordinates: [Number(longitude), Number(latitude)] };
     }
@@ -424,7 +449,7 @@ async function updateProperty(req, res) {
     // booked) does not.
     const detailsChanged = [
       title, description, price, additionalCharges, photos, amenities, address,
-      latitude, longitude, propertyType, schoolId,
+      latitude, longitude, propertyType, schoolId, proofOfOwnershipUrl,
     ].some((v) => v !== undefined);
     if (detailsChanged && ['verified', 'rejected'].includes(property.verificationStatus)) {
       property.verificationStatus = 'pending';

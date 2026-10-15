@@ -33,7 +33,7 @@ async function createSlots(req, res) {
     const provider = await getProviderProfile(req.user._id);
     if (!provider) return res.status(404).json({ message: 'Provider profile not found' });
 
-    const { propertyId, windows } = req.body;
+    const { propertyId, windows, weeklySchedule } = req.body;
     const slotMinutes = req.body.slotMinutes === undefined ? DEFAULT_SLOT_MINUTES : Number(req.body.slotMinutes);
 
     if (!propertyId || !mongoose.isValidObjectId(propertyId)) {
@@ -44,17 +44,29 @@ async function createSlots(req, res) {
         message: `slotMinutes must be a whole number between ${MIN_SLOT_MINUTES} and ${MAX_SLOT_MINUTES}`,
       });
     }
-    if (!Array.isArray(windows) || windows.length === 0) {
-      return res.status(400).json({ message: 'windows must be a non-empty array of { start, end }' });
-    }
-    if (windows.length > MAX_WINDOWS_PER_REQUEST) {
-      return res.status(400).json({ message: `You can add at most ${MAX_WINDOWS_PER_REQUEST} windows at a time` });
-    }
 
     const property = await Property.findById(propertyId);
     if (!property) return res.status(404).json({ message: 'Property not found' });
     if (!provider._id.equals(property.providerId)) {
       return res.status(403).json({ message: 'You do not own this property' });
+    }
+
+    // Weekly recurring schedule support
+    if (Array.isArray(weeklySchedule) && weeklySchedule.length > 0) {
+      const daysAhead = req.body.weeksAhead ? Number(req.body.weeksAhead) * 7 : 14;
+      const created = await generateSlotsFromWeeklySchedule(propertyId, provider._id, weeklySchedule, slotMinutes, daysAhead);
+      return res.status(201).json({
+        message: `Generated ${created.length} slots from weekly schedule`,
+        count: created.length,
+        slots: created,
+      });
+    }
+
+    if (!Array.isArray(windows) || windows.length === 0) {
+      return res.status(400).json({ message: 'windows or weeklySchedule array is required' });
+    }
+    if (windows.length > MAX_WINDOWS_PER_REQUEST) {
+      return res.status(400).json({ message: `You can add at most ${MAX_WINDOWS_PER_REQUEST} windows at a time` });
     }
 
     // ---- Validate windows and split them into slots -----------------------
@@ -342,6 +354,95 @@ async function generateDefaultSlots(propertyId, providerId, daysAhead = 10) {
   }
 }
 
+// Generates inspection slots for a property from a weekly availability schedule:
+// e.g. [{ day: 'monday', isAvailable: true, from: '10:00', to: '18:00' }, ...]
+async function generateSlotsFromWeeklySchedule(propertyId, providerId, weeklySchedule, slotMinutes = 60, daysAhead = 14) {
+  try {
+    if (!Array.isArray(weeklySchedule) || weeklySchedule.length === 0) return [];
+
+    const DAY_MAP = {
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+    };
+
+    const activeDays = new Map();
+    for (const item of weeklySchedule) {
+      const dayName = String(item.day || '').toLowerCase().trim();
+      const dayIndex = DAY_MAP[dayName];
+      if (dayIndex !== undefined && (item.isAvailable === true || item.isAvailable === 'true')) {
+        activeDays.set(dayIndex, {
+          from: item.from || '10:00',
+          to: item.to || '18:00',
+        });
+      }
+    }
+
+    if (activeDays.size === 0) return [];
+
+    const now = new Date();
+    const slotMs = (slotMinutes || DEFAULT_SLOT_MINUTES) * MINUTE_MS;
+    const slotsToCreate = [];
+    const cursor = new Date(now);
+
+    for (let d = 1; d <= daysAhead; d++) {
+      cursor.setDate(cursor.getDate() + 1);
+      const dayOfWeek = cursor.getDay();
+
+      if (activeDays.has(dayOfWeek)) {
+        const { from, to } = activeDays.get(dayOfWeek);
+        const [fromHour, fromMin] = from.split(':').map((n) => Number(n) || 0);
+        const [toHour, toMin] = to.split(':').map((n) => Number(n) || 0);
+
+        const year = cursor.getFullYear();
+        const month = String(cursor.getMonth() + 1).padStart(2, '0');
+        const day = String(cursor.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+
+        const startTime = new Date(`${dateStr}T${String(fromHour).padStart(2, '0')}:${String(fromMin).padStart(2, '0')}:00+01:00`).getTime();
+        const endTime = new Date(`${dateStr}T${String(toHour).padStart(2, '0')}:${String(toMin).padStart(2, '0')}:00+01:00`).getTime();
+
+        for (let t = startTime; t + slotMs <= endTime; t += slotMs) {
+          const startsAt = new Date(t);
+          const endsAt = new Date(t + slotMs);
+
+          if (startsAt > now) {
+            slotsToCreate.push({
+              propertyId,
+              providerId,
+              startsAt,
+              endsAt,
+              status: 'open',
+            });
+          }
+        }
+      }
+    }
+
+    if (slotsToCreate.length === 0) return [];
+
+    const existing = await Slot.find({
+      propertyId,
+      startsAt: { $in: slotsToCreate.map((s) => s.startsAt) },
+    }).select('startsAt');
+
+    const existingTimes = new Set(existing.map((e) => e.startsAt.getTime()));
+    const fresh = slotsToCreate.filter((s) => !existingTimes.has(s.startsAt.getTime()));
+
+    if (fresh.length === 0) return [];
+
+    const created = await Slot.insertMany(fresh, { ordered: false });
+    return created;
+  } catch (err) {
+    console.error('Error generating slots from weekly schedule:', err.message);
+    return [];
+  }
+}
+
 // DELETE /slots/:id  (provider, owner only) — removes an OPEN slot.
 // Booked slots are handled by the booking cancel/reschedule flow (US-20).
 async function deleteSlot(req, res) {
@@ -372,4 +473,11 @@ async function deleteSlot(req, res) {
   }
 }
 
-module.exports = { createSlots, getMySlots, getPropertySlots, deleteSlot, generateDefaultSlots };
+module.exports = {
+  createSlots,
+  getMySlots,
+  getPropertySlots,
+  deleteSlot,
+  generateDefaultSlots,
+  generateSlotsFromWeeklySchedule,
+};

@@ -24,6 +24,7 @@ async function register(req, res) {
     const {
       email, password, confirmPassword, role,
       fullName, phone, schoolId, businessName, verificationDocUrl,
+      meansOfIdentification, idNumber, accountNumber, bankName,
     } = req.body;
 
     // ---- Validate EVERYTHING before touching the database ----------------
@@ -70,7 +71,15 @@ async function register(req, res) {
       });
     } else {
       profile = await ProviderProfile.create({
-        userId: user._id, businessName, phone, verificationDocUrl,
+        userId: user._id,
+        fullName: fullName || '',
+        businessName: businessName || fullName || 'Independent Landlord',
+        phone,
+        meansOfIdentification: meansOfIdentification || '',
+        idNumber: idNumber || '',
+        accountNumber: accountNumber || '',
+        bankName: bankName || '',
+        verificationDocUrl: verificationDocUrl || '',
       });
     }
 
@@ -79,6 +88,7 @@ async function register(req, res) {
     return res.status(201).json({
       token,
       user: { id: user._id, email: user.email, role: user.role },
+      profile,
       // Only providers are reviewed by an admin; students have no review step
       verificationStatus: role === 'provider' ? profile.verificationStatus : null,
       // Both roles must verify their email before they can log in — the

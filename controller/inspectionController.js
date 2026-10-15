@@ -106,18 +106,34 @@ async function getMyInspections(req, res) {
 }
 
 // GET /inspections/received  (provider — requests on properties they own)
+// query: status ('all' | 'confirmed' | 'rescheduled' | 'completed' | 'cancelled' | etc.), q (hostel name or location)
 async function getReceivedInspections(req, res) {
   try {
     const provider = await getProviderProfile(req.user._id);
     if (!provider) return res.status(404).json({ message: 'Provider profile not found' });
 
-    const properties = await Property.find({ providerId: provider._id }).select('_id');
+    const { status, q } = req.query;
+
+    const propertyFilter = { providerId: provider._id };
+    if (q && q.trim()) {
+      const regex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      propertyFilter.$or = [{ title: regex }, { address: regex }];
+    }
+
+    const properties = await Property.find(propertyFilter).select('_id');
     const propertyIds = properties.map((p) => p._id);
 
-    const inspections = await Inspection.find({ propertyId: { $in: propertyIds } })
+    const inspectionFilter = { propertyId: { $in: propertyIds } };
+    if (status && status !== 'all') {
+      inspectionFilter.status = status;
+    }
+
+    const inspections = await Inspection.find(inspectionFilter)
+      .sort({ scheduledAt: -1, createdAt: -1 })
       .populate('propertyId')
       .populate('studentId');
-    return res.json({ inspections });
+
+    return res.json({ count: inspections.length, inspections });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to fetch inspections', error: err.message });
   }
