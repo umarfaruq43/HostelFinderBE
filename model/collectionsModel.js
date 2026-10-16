@@ -243,6 +243,7 @@ const inspectionSchema = new Schema(
         scheduledAt: Date,
         slotId: { type: Schema.Types.ObjectId, ref: "Slot" }, // US-19/20: the slot this booking holds
         reminderSentAt: { type: Date, default: null }, // US-21: set once the reminder goes out
+        studentConfirmedAt: { type: Date, default: null },
         completedAt: Date,
         declineReason: String, // set if a provider declines the request outright
         rejectionReason: String, // set if the student rejects the property after inspection
