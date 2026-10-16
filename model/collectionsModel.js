@@ -109,21 +109,26 @@ const providerProfileSchema = new Schema(
             required: true,
             unique: true,
         },
+        fullName: String,
         businessName: String,
         phone: { type: String, required: true },
+        meansOfIdentification: String, // e.g. "National ID", "Voter's Card", "Passport"
+        idNumber: String,
+        accountNumber: String,
+        bankName: String,
         verificationStatus: {
             type: String,
             enum: ["pending", "verified", "rejected"],
             default: "pending",
         },
-        verificationDocUrl: String,
+        verificationDocUrl: String, // Government ID document URL
     },
     { timestamps: true },
 );
 providerProfileSchema.index({ verificationStatus: 1 });
 
 // ------------------------------------------------------------
-// 5. PROPERTY (with embedded charges + photos)
+// 5. PROPERTY (with embedded charges + photos + availability)
 // ------------------------------------------------------------
 const chargeSchema = new Schema(
     {
@@ -141,6 +146,20 @@ const photoSchema = new Schema(
     { _id: false },
 );
 
+const weeklyAvailabilitySchema = new Schema(
+    {
+        day: {
+            type: String,
+            enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+            required: true,
+        },
+        isAvailable: { type: Boolean, default: false },
+        from: { type: String, default: "10:00" }, // e.g. "10:00"
+        to: { type: String, default: "18:00" },   // e.g. "18:00"
+    },
+    { _id: false },
+);
+
 const propertySchema = new Schema(
     {
         providerId: {
@@ -153,6 +172,8 @@ const propertySchema = new Schema(
         price: { type: Number, required: true, min: 0 },
         additionalCharges: [chargeSchema],
         photos: [photoSchema],
+        proofOfOwnershipUrl: String, // Landlord proof of ownership document
+        inspectionAvailability: [weeklyAvailabilitySchema], // Weekly inspection schedule
         address: { type: String, required: true },
         location: { type: pointSchema, required: true }, // GeoJSON Point,
         amenities: { type: [String], default: [] }, // was String — arrays failed to cast

@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -13,12 +14,14 @@ const reportRoutes = require('./routes/reportRoutes');
 const slotRoutes = require('./routes/slotRoutes');
 const mailerRoutes = require('./routes/mailerRoutes');
 const schoolRoutes = require('./routes/schoolRoutes');
-const otpRoutes = require('./routes/otpRoutes')
+const otpRoutes = require('./routes/otpRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 const { startReminderJob } = require('./utils/reminders');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/auth', authRoutes);
 app.use('/properties', propertyRoutes);
@@ -31,6 +34,7 @@ app.use('/slots', slotRoutes);
 app.use('/notifications', mailerRoutes);
 app.use('/schools', schoolRoutes);
 app.use('/auth/otp', otpRoutes);
+app.use('/upload', uploadRoutes);
 
 const PORT = process.env.PORT || 2008;
 
