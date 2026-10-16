@@ -72,6 +72,34 @@ const templates = {
     subject: 'Inspection rescheduled',
     text: `${propLine(property)}New time: ${fmt(scheduledAt)}`,
   }),
+  // Student confirms they will attend a booked inspection
+  inspection_confirmed: ({ property, scheduledAt, role }) => ({
+    subject: 'Student confirmed attendance',
+    text: `${propLine(property)}When: ${fmt(scheduledAt)}\n${
+      role === 'provider'
+        ? 'The student has confirmed they will attend this inspection.'
+        : 'You have confirmed your attendance for this inspection.'
+    }`,
+  }),
+  // After inspecting, the student turns the property down
+  // (distinct from inspection_rejected, which is the admin rejecting a request)
+  student_rejected_property: ({ property, role, reason }) => ({
+    subject: 'Student decided not to proceed',
+    text: `${propLine(property)}${
+      role === 'provider'
+        ? `The student inspected this property and decided not to proceed.${reason ? `\nReason: ${reason}` : ''}\nYour listing is still available.`
+        : 'You have rejected this property after your inspection.'
+    }`,
+  }),
+  // After inspecting, the student goes ahead with the property
+  inspection_accepted: ({ property, role }) => ({
+    subject: 'Student is proceeding with the property',
+    text: `${propLine(property)}${
+      role === 'provider'
+        ? 'The student has chosen to proceed with this property. A transaction has been started and the listing is now marked as booked.'
+        : 'You have chosen to proceed with this property. A transaction has been started.'
+    }`,
+  }),
   // US-28 — admin suspends/reactivates a user account
   account_suspended: ({ reason }) => ({
     subject: 'Your account has been suspended',

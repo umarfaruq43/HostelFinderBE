@@ -199,6 +199,36 @@ async function declineInspection(req, res) {
   }
 }
 
+// PUT /inspections/:id/confirm  (student only)
+async function confirmInspection(req, res) {
+  try {
+    const inspection = await Inspection.findById(req.params.id);
+    if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
+
+    const student = await getStudentProfile(req.user._id);
+    if (!student || !student._id.equals(inspection.studentId)) {
+      return res.status(403).json({ message: 'Not your inspection' });
+    }
+    if (!['confirmed', 'rescheduled'].includes(inspection.status)) {
+      return res.status(400).json({ message: `Cannot confirm an inspection with status "${inspection.status}"` });
+    }
+    if (inspection.scheduledAt && inspection.scheduledAt <= new Date()) {
+      return res.status(400).json({ message: 'This inspection time has already passed' });
+    }
+    if (inspection.studentConfirmedAt) {
+      return res.status(409).json({ message: 'You have already confirmed this inspection' });
+    }
+
+    inspection.studentConfirmedAt = new Date();
+    await inspection.save();
+
+    notifyInspection(inspection, 'inspection_confirmed');
+    return res.json({ inspection });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to confirm inspection', error: err.message });
+  }
+}
+
 // PUT /inspections/:id/reschedule  (provider, owner only)
 // Slot-based bookings: body { slotId } = a NEW open slot for the same property
 // (the old slot is released). Legacy bookings without a slot: body { scheduledAt }.
@@ -351,43 +381,8 @@ async function completeInspection(req, res) {
     inspection.status = 'completed';
     inspection.completedAt = new Date();
     await inspection.save();
-    return res.json({ inspection });
-  } catch (err) {
-    return res.status(500).json({ message: 'Failed to complete inspection', error: err.message });
-  }
-}
-
-// PUT /inspections/:id/decision  (student only)  body: { decision: 'accepted'|'rejected' }
-// Accepting automatically creates the Transaction — this is the
-// "ACCEPT/REJECT -> PROCEED/TRANSACTION STATUS" step in the journey.
-async function decideInspection(req, res) {
-  try {
-    const { decision, reason } = req.body;
-    if (!['accepted', 'rejected'].includes(decision)) {
-      return res.status(400).json({ message: 'decision must be accepted or rejected' });
-    }
-
-    const inspection = await Inspection.findById(req.params.id);
-    if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
-
-    const student = await getStudentProfile(req.user._id);
-    if (!student || !student._id.equals(inspection.studentId)) {
-      return res.status(403).json({ message: 'Not your inspection' });
-    }
-    if (inspection.status !== 'completed') {
-      return res.status(400).json({ message: 'Inspection must be completed before a decision can be made' });
-    }
-    if (inspection.decision !== 'pending') {
-      return res.status(409).json({ message: 'A decision has already been made for this inspection' });
-    }
-
-    inspection.decision = decision;
-    if (decision === 'rejected' && reason) {
-      inspection.rejectionReason = reason;
-    }
-    await inspection.save();
-
-    let transaction = null;
+    
+     let transaction = null;
     if (decision === 'accepted') {
       const property = await Property.findById(inspection.propertyId);
       const chargesTotal = (property.additionalCharges || []).reduce((sum, c) => sum + c.amount, 0);
@@ -404,11 +399,93 @@ async function decideInspection(req, res) {
     }
     // On rejection, the property is left untouched — it stays 'available'.
 
-    return res.json({ inspection, transaction });
+    return res.json({message:'inspection completed', inspection, transaction });
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to record decision', error: err.message });
+    return res.status(500).json({ message: 'Failed to complete inspection', error: err.message });
   }
 }
+
+// PUT /inspections/:id/proceed  (student only)
+async function proceedInspection(req, res) {
+  let claimedProperty = null;
+  try {
+    const inspection = await Inspection.findById(req.params.id);
+    if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
+
+    const student = await getStudentProfile(req.user._id);
+    if (!student || !student._id.equals(inspection.studentId)) {
+      return res.status(403).json({ message: 'Not your inspection' });
+    }
+    if (inspection.status !== 'completed') {
+      return res.status(400).json({ message: 'Inspection must be completed before you can proceed' });
+    }
+    if (inspection.decision !== 'pending') {
+      return res.status(409).json({ message: `You have already ${inspection.decision} this inspection` });
+    }
+
+    claimedProperty = await Property.findOneAndUpdate(
+      { _id: inspection.propertyId, availabilityStatus: 'available' },
+      { $set: { availabilityStatus: 'booked' } },
+      { new: true }
+    );
+    if (!claimedProperty) {
+      return res.status(409).json({ message: 'This property is no longer available' });
+    }
+
+    const chargesTotal = (claimedProperty.additionalCharges || []).reduce((sum, c) => sum + c.amount, 0);
+    const transaction = await Transaction.create({
+      inspectionId: inspection._id,
+      amount: claimedProperty.price + chargesTotal,
+    });
+
+    inspection.decision = 'accepted';
+    await inspection.save();
+
+    notifyInspection(inspection, 'inspection_accepted');
+    return res.json({ message: 'You have proceeded with this property', inspection, transaction });
+  } catch (err) {
+    if (claimedProperty) {
+      await Property.updateOne({ _id: claimedProperty._id }, { $set: { availabilityStatus: 'available' } }).catch(() => {});
+    }
+    return res.status(500).json({ message: 'Failed to proceed with property', error: err.message });
+  }
+}
+
+// PUT /inspections/:id/reject  (student only)  body: { reason? }
+// After attending (status 'completed') if the student turns the property down.
+// The property is left untouched, so it stays 'available' for other students,
+// and no Transaction is created.
+async function rejectInspection(req, res) {
+  try {
+    const inspection = await Inspection.findById(req.params.id);
+    if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
+
+    const student = await getStudentProfile(req.user._id);
+    if (!student || !student._id.equals(inspection.studentId)) {
+      return res.status(403).json({ message: 'Not your inspection' });
+    }
+    if (inspection.status !== 'completed') {
+      return res.status(400).json({ message: 'Inspection must be completed before you can reject it' });
+    }
+    if (inspection.decision !== 'pending') {
+      return res.status(409).json({ message: `You have already ${inspection.decision} this inspection` });
+    }
+
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+
+    inspection.decision = 'rejected';
+    if (reason) inspection.rejectionReason = reason;
+    await inspection.save();
+
+    // Let the landlord know (never blocks the response)
+    notifyInspection(inspection, 'inspection_rejected');
+
+    return res.json({ message: 'Inspection rejected', inspection });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to reject inspection', error: err.message });
+  }
+}
+
 
 // DELETE /inspections/:id  (student only) - cancel before it's completed.
 // Frees the booked slot so another student can take it.
@@ -443,10 +520,12 @@ module.exports = {
   getInspectionById,
   scheduleInspection,
   declineInspection,
+  confirmInspection,
   rescheduleInspection,
   rescheduleMyInspection,
   missedInspection,
   completeInspection,
-  decideInspection,
+  proceedInspection,
+  rejectInspection,
   cancelInspection,
 };
