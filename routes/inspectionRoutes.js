@@ -25,7 +25,7 @@ router.get('/received', protect, authorize('provider'), getReceivedInspections);
 router.get('/:id', protect, getInspectionById);
 router.put('/:id/schedule', protect, authorize('provider'), scheduleInspection);
 router.put('/:id/decline', protect, authorize('provider'), declineInspection);
-router.put('/:id/confirm', protect, authorize('student'), confirmInspection)
+router.put('/:id/confirm', protect, authorize('student'), confirmInspection);
 router.put('/:id/reschedule', protect, authorize('provider'), rescheduleInspection);
 router.put('/:id/reschedule-mine', protect, authorize('student'), rescheduleMyInspection);
 router.put('/:id/missed', protect, authorize('provider'), missedInspection);

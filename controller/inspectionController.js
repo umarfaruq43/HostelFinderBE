@@ -88,7 +88,7 @@ async function requestInspection(req, res) {
   } catch (err) {
     // Roll the slot back if we claimed it but failed afterwards.
     if (claimedSlot) await releaseSlot(claimedSlot._id).catch(() => {});
-    return res.status(500).json({ message: 'Failed to book inspection', error: err.message });
+    return res.status(500).json({ message: 'Server error', error: err.message });
   }
 }
 
@@ -289,6 +289,7 @@ async function rescheduleInspection(req, res) {
 
     inspection.status = 'rescheduled';
     inspection.reminderSentAt = null; // new time -> new reminder
+    inspection.studentConfirmedAt = null; // student must re-confirm the new time
     await inspection.save();
 
     notifyInspection(inspection, 'inspection_rescheduled');
@@ -344,6 +345,7 @@ async function rescheduleMyInspection(req, res) {
     inspection.scheduledAt = newSlot.startsAt;
     inspection.status = 'rescheduled';
     inspection.reminderSentAt = null; // new time -> new reminder
+    inspection.studentConfirmedAt = null; // student must re-confirm the new time
     await inspection.save();
 
     await releaseSlot(oldSlotId);
@@ -397,25 +399,8 @@ async function completeInspection(req, res) {
     inspection.status = 'completed';
     inspection.completedAt = new Date();
     await inspection.save();
-    
-     let transaction = null;
-    if (decision === 'accepted') {
-      const property = await Property.findById(inspection.propertyId);
-      const chargesTotal = (property.additionalCharges || []).reduce((sum, c) => sum + c.amount, 0);
-      transaction = await Transaction.create({
-        inspectionId: inspection._id,
-        amount: property.price + chargesTotal,
-      });
 
-      // Take the property off the market — it's no longer available for
-      // other students to request or find in search once someone has
-      // accepted it and a transaction has started.
-      property.availabilityStatus = 'booked';
-      await property.save();
-    }
-    // On rejection, the property is left untouched — it stays 'available'.
-
-    return res.json({message:'inspection completed', inspection, transaction });
+    return res.json({ message: 'Inspection completed', inspection });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to complete inspection', error: err.message });
   }
@@ -494,7 +479,7 @@ async function rejectInspection(req, res) {
     await inspection.save();
 
     // Let the landlord know (never blocks the response)
-    notifyInspection(inspection, 'inspection_rejected');
+    notifyInspection(inspection, 'student_rejected_property', { reason: inspection.rejectionReason });
 
     return res.json({ message: 'Inspection rejected', inspection });
   } catch (err) {
